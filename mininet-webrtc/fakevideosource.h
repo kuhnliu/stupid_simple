@@ -1,11 +1,12 @@
 #ifndef FAKEVIDEOSOURCE_H_
 #define FAKEVIDEOSOURCE_H_
-#include "rtc_base/thread.h"
+//#include "rtc_base/thread.h"
+#include "rtc_base/task_queue.h"
 #include "videosource.h"
 namespace zsy{
 class VideoGenerator:public VideoSource{
 public:
-	VideoGenerator(rtc::Thread *w,uint32_t fs,uint32_t minR);
+	VideoGenerator(rtc::TaskQueue *w,uint32_t fs,uint32_t minR);
 	~VideoGenerator() override{};
 	void Start() override;
 	void Stop() override;
@@ -13,7 +14,7 @@ public:
 	void SendFrame();
 	void Generate();
 private:
-	rtc::Thread *w_;
+	rtc::TaskQueue *w_;
 	uint32_t fs_;
 	uint32_t rate_;
 	uint32_t minR_;

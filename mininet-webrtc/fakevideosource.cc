@@ -1,5 +1,6 @@
 #include "fakevideosource.h"
-VideoGenerator::VideoGenerator(rtc::Thread *w,uint32_t fs,uint32_t minR){
+namespace zsy{
+VideoGenerator::VideoGenerator(rtc::TaskQueue *w,uint32_t fs,uint32_t minR){
 	w_=w;
 	fs_=fs;
 	rate_=minR;
@@ -33,6 +34,8 @@ void VideoGenerator::Generate(){
 		},duration);
 	}
 }
+}
+
 
 
 

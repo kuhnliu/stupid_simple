@@ -24,8 +24,8 @@ void Sender::SetEncoder(VideoSource *encoder){
 void Sender::Bind(std::string ip,uint16_t port){
 	 su_udp_create(ip.c_str(),port,&fd_);
 }
-void Sender::SetPeer(std::string addr){
-	 su_string_to_addr(&dst,addr.c_str());
+void Sender::SetPeer(char* addr){
+	 su_string_to_addr(&dst,addr);
 }
 void Sender::Start(){
 	running_=true;
@@ -104,8 +104,8 @@ void Sender::SendVideo(uint8_t payload_type,int ftype,
 	timestamp=now-first_ts_;
 	uint8_t* pos;
 	uint16_t splits[MAX_SPLIT_NUMBER], total=0;
-	assert((size / SIM_VIDEO_SIZE) < MAX_SPLIT_NUMBER);
-	total = FrameSplit(splits, size);
+	assert((len / SIM_VIDEO_SIZE) < MAX_SPLIT_NUMBER);
+	total = FrameSplit(splits, len);
 	pos = (uint8_t*)data;
 	std::map<uint16_t,uint16_t> seq_len_map;
 	int i=0;
@@ -131,14 +131,14 @@ void Sender::SendVideo(uint8_t payload_type,int ftype,
 			pos += splits[i];
 			overhead=seg->data_size+SIM_SEGMENT_HEADER_SIZE;
 			pending_buf_.insert(std::make_pair(seg->transport_seq,seg));
-			seq_len_map.insert(std::make_pair(seg->transport_seq,overhead))
+			seq_len_map.insert(std::make_pair(seg->transport_seq,overhead));
 		}
 	}
 	frame_seed_++;
 	for(auto it=seq_len_map.begin();it!=seq_len_map.end();it++){
 		uint16_t seq=it->first;
 		uint16_t overhead=it->second;
-		send_bucket_->InsertPacket(webrtc::PacedSender::kNormalPriority,uid_,
+		pacer_->InsertPacket(webrtc::PacedSender::kNormalPriority,uid_,
 				seq,now,overhead,false);
 	}
 }
@@ -156,7 +156,7 @@ bool Sender::TimeToSendPacket(uint32_t ssrc,
 		if(cc_){
 		cc_->AddPacket(uid_,sequence_number,overhead,webrtc::PacedPacketInfo());
 		rtc::SentPacket sentPacket((int64_t)sequence_number,now);
-		cc->OnSentPacket(sentPacket);
+		cc_->OnSentPacket(sentPacket);
 		}
 		delete seg;
 	}
@@ -166,7 +166,7 @@ bool Sender::TimeToSendPacket(uint32_t ssrc,
 int  Sender::SendPadding(uint16_t payload_len,uint32_t ts){
     sim_header_t header;
 	sim_pad_t pad;
-	uint8_t header_len=sizeof(sim_header_t)+sizeof(sim_pad_t);
+	uint32_t header_len=sizeof(sim_header_t)+sizeof(sim_pad_t);
 	pad.data_size=payload_len;
 	pad.send_ts=ts;
 	uint16_t sequence_number=trans_seq_;
@@ -177,13 +177,13 @@ int  Sender::SendPadding(uint16_t payload_len,uint32_t ts){
 	sim_encode_msg(&stream_, &header, &pad);
 	SendToNetwork(stream_.data,stream_.used);
 	if(cc_){
-    cc_->AddPacket(uid,sequence_number,overhead,webrtc::PacedPacketInfo());
+    cc_->AddPacket(uid_,sequence_number,overhead,webrtc::PacedPacketInfo());
     rtc::SentPacket sentPacket((int64_t)sequence_number,ts);
     cc_->OnSentPacket(sentPacket);
     }
 	return overhead;
 }
-virtual size_t Sender::TimeToSendPadding(size_t bytes,
+size_t Sender::TimeToSendPadding(size_t bytes,
                                  const webrtc::PacedPacketInfo& cluster_info){
 	int64_t now=rtc::TimeMillis();
 	int remain=bytes;
@@ -222,7 +222,7 @@ void Sender::OnNetworkChanged(uint32_t bitrate_bps,
 sim_segment_t *Sender::get_segment_t(uint16_t sequence_number){
 	sim_segment_t *seg=NULL;
 	rtc::CritScope cs(&buf_mutex_);
-	auto it=pending_buf_.find(seq);
+	auto it=pending_buf_.find(sequence_number);
 	if(it!=pending_buf_.end()){
 		seg=it->second;
 		pending_buf_.erase(it);
@@ -260,7 +260,7 @@ void Sender::ProcessingMsg(bin_stream_t *stream){
 	}
 	case SIM_FEEDBACK:{
 		sim_feedback_t feedback;
-		if (sim_decode_msg(stream, header, &feedback) != 0)
+		if (sim_decode_msg(stream, &header, &feedback) != 0)
 			return;
 			InnerProcessFeedback(&feedback);
 			break;
@@ -276,7 +276,7 @@ void Sender::SendPing(int64_t now){
 	INIT_SIM_HEADER(header, SIM_PING, uid_);
 	body.ts = now;
 	sim_encode_msg(&stream_, &header, &body);
-	SendToNetwork(stream_->data,stream_->used);
+	SendToNetwork(stream_.data,stream_.used);
 	update_ping_ts_=now;
 }
 void Sender::UpdateRtt(uint32_t time,int64_t now){

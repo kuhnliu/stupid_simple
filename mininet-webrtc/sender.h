@@ -4,7 +4,7 @@
 #include "system_wrappers/include/clock.h"
 #include "modules/utility/include/process_thread.h"
 #include "system_wrappers/include/clock.h"
-#include "modules/congestion_controller/send_side_congestion_controller.h"
+#include "modules/congestion_controller/include/send_side_congestion_controller.h"
 #include "logging/rtc_event_log/rtc_event_log.h"
 #include "modules/rtp_rtcp/source/rtcp_packet/transport_feedback.h"
 #include "modules/pacing/paced_sender.h"
@@ -12,7 +12,8 @@
 #include "sendinterface.h"
 #include "videosource.h"
 #include "sim_proto.h"
-
+#include "cf_stream.h"
+#include "cf_platform.h"
 #include <memory>
 #include <map>
 #include <string>
@@ -26,7 +27,7 @@ public:
 	void SetEncoder(VideoSource *encoder);
 	void Bind(std::string ip,uint16_t port);
 	//"ip:port"
-	void SetPeer(std::string addr);
+	void SetPeer(char* addr);
 	void Start();
 	void Stop();
 	void Process();
@@ -48,7 +49,7 @@ private:
 	void SendSegment(sim_segment_t *seg);
 	int SendPadding(uint16_t payload_len,uint32_t ts);
 	void SendToNetwork(uint8_t*data,uint32_t len);
-	void ProcessingMsg(sim_header_t*header,bin_stream_t *stream);
+	void ProcessingMsg(bin_stream_t *stream);
 	void InnerProcessFeedback(sim_feedback_t* feedback);
 	void SendPing(int64_t now);
 	void UpdateRtt(uint32_t time,int64_t now);
@@ -64,7 +65,7 @@ private:
 	VideoSource *encoder_{NULL};
 	bin_stream_t	stream_;
 	std::unique_ptr<webrtc::ProcessThread> pm_;
-	std::unique_ptr<SendSideCongestionControllerInterface> cc_;
+	std::unique_ptr<webrtc::SendSideCongestionControllerInterface> cc_;
 	webrtc::PacedSender *pacer_{NULL};
 	webrtc::RtcEventLogNullImpl m_nullLog;
 	webrtc::Clock *clock_{NULL};

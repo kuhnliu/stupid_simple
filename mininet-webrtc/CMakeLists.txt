@@ -18,14 +18,14 @@ endif()
 include_directories(/home/zsy/webrtc_2018_1/src/)
 include_directories(/home/zsy/webrtc_2018_1/src/third_party/abseil-cpp/)
 LINK_DIRECTORIES(/home/zsy/webrtc_2018_1/src/out/Default/obj/)
-add_definitions(-std=c++11)
+#add_definitions(-std=c++11)
 
 include_directories(${CMAKE_SOURCE_DIR}/razor)
 add_subdirectory(razor)
 
 set(simulation_FILES
 sender.cc
-fakevideogenerator.cc
+fakevideosource.cc
 )
 add_library(simulation STATIC ${simulation_FILES})
 #cmake .. -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
