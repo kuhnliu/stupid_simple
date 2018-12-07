@@ -1,5 +1,6 @@
 #ifndef FAKEVIDEOSOURCE_H_
 #define FAKEVIDEOSOURCE_H_
+#include <stdlib.h>
 //#include "rtc_base/thread.h"
 #include "rtc_base/task_queue.h"
 #include "videosource.h"
@@ -11,6 +12,7 @@ public:
 	void Start() override;
 	void Stop() override;
 	void RegisterSender(SendInterface *sender) override;
+	void ChangeRate(uint32_t bitrate) override;
 	void SendFrame();
 	void Generate();
 private:

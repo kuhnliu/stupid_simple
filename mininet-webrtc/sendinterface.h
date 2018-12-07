@@ -1,5 +1,6 @@
 #ifndef SENDINTERFACE_H_
 #define SENDINTERFACE_H_
+#include <stdint.h>
 namespace zsy{
 class SendInterface{
 public:

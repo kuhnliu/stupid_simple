@@ -1,5 +1,6 @@
 #ifndef SENDER_H_
 #define SENDER_H_
+#include <stdlib.h>
 #include "rtc_base/criticalsection.h"
 #include "system_wrappers/include/clock.h"
 #include "modules/utility/include/process_thread.h"

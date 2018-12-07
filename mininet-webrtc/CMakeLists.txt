@@ -21,7 +21,9 @@ LINK_DIRECTORIES(/home/zsy/webrtc_2018_1/src/out/Default/obj/)
 #add_definitions(-std=c++11)
 
 include_directories(${CMAKE_SOURCE_DIR}/razor)
+include_directories(${CMAKE_SOURCE_DIR}/)
 add_subdirectory(razor)
+add_subdirectory(test)
 
 set(simulation_FILES
 sender.cc

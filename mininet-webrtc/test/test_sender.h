@@ -1,12 +1,14 @@
 #ifndef TEST_TEST_SENDER_H_
 #define TEST_TEST_SENDER_H_
+#include <stdint.h>
 #include "sendinterface.h"
 #include "videosource.h"
+#include <stdlib.h> //for NULL
 namespace zsy{
 class TestSender:public SendInterface{
 public:
 	TestSender(VideoSource *vs);
-	~TestSender();
+	~TestSender(){};
 	void Start();
 	void Stop();
 	void SendVideo(uint8_t payload_type,int ftype,

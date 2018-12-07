@@ -16,6 +16,13 @@ void VideoGenerator::Stop(){
 void VideoGenerator::RegisterSender(SendInterface *sender){
 	sender_=sender;
 }
+void VideoGenerator::ChangeRate(uint32_t bitrate){
+	if(bitrate>minR_){
+		rate_=bitrate;
+	}else{
+		rate_=minR_;	
+	}
+}
 void VideoGenerator::SendFrame(){
 	float len=(float)rate_/(fs_ * 8.f);
 	uint32_t bytesToSend=len;
