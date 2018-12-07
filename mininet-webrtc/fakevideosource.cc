@@ -1,4 +1,6 @@
 #include "fakevideosource.h"
+#include <unistd.h>
+#include "rtc_base/timeutils.h"
 namespace zsy{
 VideoGenerator::VideoGenerator(rtc::TaskQueue *w,uint32_t fs,uint32_t minR){
 	w_=w;
@@ -22,6 +24,22 @@ void VideoGenerator::ChangeRate(uint32_t bitrate){
 	}else{
 		rate_=minR_;	
 	}
+	if(log_enable_){
+		LogRate(rate_);
+	}
+}
+void VideoGenerator::SetLogFile(std::string name){
+	char buf[FILENAME_MAX];
+	memset(buf,0,FILENAME_MAX);
+	std::string path = std::string (getcwd(buf, FILENAME_MAX))
+			+name+"_rate.txt";
+	log_enable_=true;
+	f_rate_.open(path.c_str(), std::fstream::out);
+}
+void VideoGenerator::Close(){
+	if(f_rate_.is_open()){
+		f_rate_.close();
+	}
 }
 void VideoGenerator::SendFrame(){
 	float len=(float)rate_/(fs_ * 8.f);
@@ -39,6 +57,29 @@ void VideoGenerator::Generate(){
 		w_->PostDelayedTask([this]{
 			this->Generate();
 		},duration);
+	}
+}
+void VideoGenerator::LogRate(uint32_t bitrate){
+	uint32_t now=rtc::TimeMillis();
+	if(first_==0){
+		first_=now;
+	}
+	uint32_t abs=now-first_;
+	time_rate_t record;
+	record.now=abs;
+	record.bps=bitrate;
+	w_->PostTask([this,record]{
+		this->WriteToFile(record);
+	});
+}
+void VideoGenerator::WriteToFile(time_rate_t record){
+	if(f_rate_.is_open()){
+		char line [256];
+		memset(line,0,256);
+		uint32_t abs=record.now;
+		float kbps=(float)record.bps/1000.0;
+		sprintf (line, "%d,%16f",abs,kbps);
+		f_rate_<<line<<std::endl;
 	}
 }
 }

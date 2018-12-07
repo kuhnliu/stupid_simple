@@ -27,7 +27,16 @@ add_subdirectory(test)
 
 set(simulation_FILES
 sender.cc
+receiver.cc
 fakevideosource.cc
 )
 add_library(simulation STATIC ${simulation_FILES})
+
+set(EXECUTABLE_NAME "t_sender")
+add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/t_sender.cc)
+target_link_libraries(${EXECUTABLE_NAME} razor simulation webrtc pthread)
+
+set(EXECUTABLE_NAME "t_receiver")
+add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/t_receiver.cc)
+target_link_libraries(${EXECUTABLE_NAME} razor simulation webrtc pthread)
 #cmake .. -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++

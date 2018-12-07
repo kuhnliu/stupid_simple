@@ -26,7 +26,7 @@ public:
 	Sender();
 	~Sender();
 	void SetEncoder(VideoSource *encoder);
-	void Bind(std::string ip,uint16_t port);
+	void Bind(char *ip,uint16_t port);
 	//"ip:port"
 	void SetPeer(char* addr);
 	void Start();
@@ -77,6 +77,7 @@ private:
 	int64_t rtt_num_{0};
 	uint32_t max_rtt_{0};
 	int64_t update_ping_ts_{0};
+	uint32_t base_seq_=0;
 };
 }
 

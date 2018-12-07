@@ -5,6 +5,7 @@
 #include "absl/types/optional.h"
 #include "api/rtp_headers.h"
 #include "rtc_base/socket.h"
+#include <memory.h>
 namespace zsy{
 const uint32_t kInitialBitrateBps = 500000;
 Sender::Sender(){
@@ -17,12 +18,22 @@ Sender::~Sender(){
 	if(pacer_){
 		delete pacer_;
 	}
+	{
+		rtc::CritScope cs(&buf_mutex_);
+		while(!pending_buf_.empty()){
+			sim_segment_t *seg=NULL;
+			auto it=pending_buf_.begin();
+			seg=it->second;
+			pending_buf_.erase(it);
+			delete seg;
+		}
+	}
 }
 void Sender::SetEncoder(VideoSource *encoder){
 	encoder_=encoder;
 }
-void Sender::Bind(std::string ip,uint16_t port){
-	 su_udp_create(ip.c_str(),port,&fd_);
+void Sender::Bind(char*ip,uint16_t port){
+	 su_udp_create(ip,port,&fd_);
 }
 void Sender::SetPeer(char* addr){
 	 su_string_to_addr(&dst,addr);
@@ -58,12 +69,25 @@ void Sender::Process(){
 	if(!running_){
 		return;
 	}
-	if(rtt_num_>1){
-		int64_t now=rtc::TimeMillis();
-		if(now-update_ping_ts_>rtt_){
-			SendPing(now);
-		}
+	int64_t now=rtc::TimeMillis();
+	uint32_t delta=100;
+	if(rtt_!=0){
+		delta=rtt_;
 	}
+	if(now-update_ping_ts_>delta){
+		SendPing(now);
+	}
+	su_addr remote;
+	bin_stream_t rstream;
+	bin_stream_init(&rstream);
+	int32_t ret=0;
+	ret=su_udp_recv(fd_,&remote,rstream.data,rstream.size,0);
+	if(ret>0){
+		memcpy(&dst,&remote,sizeof(su_addr));
+		rstream.used=ret;
+		ProcessingMsg(&rstream);
+	}
+	bin_stream_destroy(&rstream);
 }
 #define MAX_SPLIT_NUMBER	1024
 static uint16_t FrameSplit(uint16_t splits[], size_t size){
