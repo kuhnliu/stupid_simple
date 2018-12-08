@@ -47,7 +47,7 @@ public:
 	                      int64_t probing_interval_ms) override;
 private:
 	sim_segment_t* get_segment_t(uint16_t sequence_number);
-	void SendSegment(sim_segment_t *seg);
+	void SendSegment(sim_segment_t *seg,uint32_t now);
 	int SendPadding(uint16_t payload_len,uint32_t ts);
 	void SendToNetwork(uint8_t*data,uint32_t len);
 	void ProcessingMsg(bin_stream_t *stream);
@@ -59,7 +59,6 @@ private:
 	su_socket fd_{0};
 	rtc::CriticalSection buf_mutex_;
 	std::map<uint16_t,sim_segment_t*>pending_buf_;
-	uint32_t fid_{1};
 	uint32_t frame_seed_{1};
 	uint32_t packet_seed_{1};
 	uint16_t trans_seq_{1};

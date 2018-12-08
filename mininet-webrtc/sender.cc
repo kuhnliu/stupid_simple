@@ -31,6 +31,7 @@ Sender::~Sender(){
 }
 void Sender::SetEncoder(VideoSource *encoder){
 	encoder_=encoder;
+	encoder_->RegisterSender(this);
 }
 void Sender::Bind(char*ip,uint16_t port){
 	 su_udp_create(ip,port,&fd_);
@@ -64,6 +65,7 @@ void Sender::Stop(){
 	}
 	pm_->DeRegisterModule(pacer_);
 	pm_->DeRegisterModule(cc_.get());
+	pm_->Stop();
 }
 void Sender::Process(){
 	if(!running_){
@@ -175,7 +177,7 @@ bool Sender::TimeToSendPacket(uint32_t ssrc,
 	sim_segment_t *seg=get_segment_t(sequence_number);
 	int64_t now=rtc::TimeMillis();
 	if(seg){
-		SendSegment(seg);
+		SendSegment(seg,now);
 		uint16_t overhead=seg->data_size+SIM_SEGMENT_HEADER_SIZE;
 		if(cc_){
 		cc_->AddPacket(uid_,sequence_number,overhead,webrtc::PacedPacketInfo());
@@ -336,5 +338,20 @@ void Sender::UpdateRtt(uint32_t time,int64_t now){
 	if(cc_){
 		cc_->OnRttUpdate(averageRtt,max_rtt_);
 	}
+}
+void Sender::InnerProcessFeedback(sim_feedback_t* feedback){
+	std::unique_ptr<webrtc::rtcp::TransportFeedback> fb=
+	webrtc::rtcp::TransportFeedback::ParseFrom((uint8_t*)feedback->feedback, feedback->feedback_size);
+	if(cc_){
+        //printf("fb %d\n",feedback->feedback_size);
+		cc_->OnTransportFeedback(*fb.get());
+	}
+}
+void Sender::SendSegment(sim_segment_t *seg,uint32_t now){
+	sim_header_t header;
+	seg->send_ts = (uint16_t)(now - first_ts_- seg->timestamp);
+	INIT_SIM_HEADER(header, SIM_SEG, uid_);
+	sim_encode_msg(&stream_, &header, seg);
+	SendToNetwork(stream_.data,stream_.used);
 }
 }

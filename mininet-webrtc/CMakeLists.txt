@@ -14,7 +14,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
 	add_definitions(-DWEBRTC_POSIX -DWEBRTC_LINUX)
 endif()
-
+add_definitions(-fno-rtti)
 include_directories(/home/zsy/webrtc_2018_1/src/)
 include_directories(/home/zsy/webrtc_2018_1/src/third_party/abseil-cpp/)
 LINK_DIRECTORIES(/home/zsy/webrtc_2018_1/src/out/Default/obj/)
@@ -34,9 +34,9 @@ add_library(simulation STATIC ${simulation_FILES})
 
 set(EXECUTABLE_NAME "t_sender")
 add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/t_sender.cc)
-target_link_libraries(${EXECUTABLE_NAME} razor simulation webrtc pthread)
+target_link_libraries(${EXECUTABLE_NAME}  simulation razor webrtc pthread)
 
 set(EXECUTABLE_NAME "t_receiver")
 add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/t_receiver.cc)
-target_link_libraries(${EXECUTABLE_NAME} razor simulation webrtc pthread)
+target_link_libraries(${EXECUTABLE_NAME}  simulation razor webrtc pthread)
 #cmake .. -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++

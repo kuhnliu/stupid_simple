@@ -158,7 +158,6 @@ int su_udp_create(const char *ip, uint16_t port, su_socket *fd)
 	else
 		addr.sin_addr.s_addr = inet_addr(ip);
 
-	su_socket_noblocking(s);
 #else
 	if (ip == NULL || strlen(ip) == 0)
 		addr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -170,9 +169,8 @@ int su_udp_create(const char *ip, uint16_t port, su_socket *fd)
 
 	if (bind(s, (struct sockaddr *)&addr, sizeof(struct sockaddr)) < 0)
 		return -1;
-
 	*fd = s;
-
+	su_socket_noblocking(s);
 	return 0;
 }
 

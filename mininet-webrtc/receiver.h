@@ -29,7 +29,7 @@ public:
 	                                       uint32_t bitrate) override{
 
 	}
-	bool SendTransportFeedback(rtcp::TransportFeedback* packet) override;
+	bool SendTransportFeedback(webrtc::rtcp::TransportFeedback* packet) override;
 private:
 	void SendToNetwork(uint8_t*data,uint32_t len);
 	void ProcessingMsg(bin_stream_t *stream);
@@ -55,6 +55,7 @@ private:
 	int64_t update_ping_ts_{0};
 	uint32_t duration_{0};
 	uint32_t stop_ts_{0};
+	uint32_t base_seq_{0};
 };
 }
 #endif /* RECEIVER_H_ */

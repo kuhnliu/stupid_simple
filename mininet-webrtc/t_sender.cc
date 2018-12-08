@@ -4,12 +4,12 @@
 #include "sender.h"
 #include "fakevideosource.h"
 #include "rtc_base/timeutils.h"
-static int runTime=5000;
+static int runTime=200000;
 static int run_status=1;
 
-char ip[]="127.0.0.1";
+char ip[]="10.0.0.1";
 uint16_t port=1234;
-char serv_addr[]="127.0.0.1:4321";
+char serv_addr[]="10.0.4.2:4321";
 
 void signal_exit_handler(int sig)
 {
@@ -22,7 +22,8 @@ int main(){
 	rtc::TaskQueue task_queue("test");
 	uint32_t minR=500000;
 	zsy::VideoGenerator source(&task_queue,25,minR);
-	zsy::Sender sender(&source);
+	zsy::Sender sender;
+	sender.SetEncoder(&source);
 	sender.Bind(ip,port);
 	sender.SetPeer(serv_addr);
 	uint32_t now=rtc::TimeMillis();

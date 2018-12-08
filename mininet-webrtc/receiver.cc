@@ -21,10 +21,11 @@ void Receiver::SetRunDuration(uint32_t delta){
 bool Receiver::IsStop(){
 	bool ret=false;
 	if(session_connected_){
-		uint32_t now=rtc::TimeMillis();
-		if(now>stop_ts_){
-			ret=true;
-			Stop();
+		if(stop_ts_!=0){
+			uint32_t now=rtc::TimeMillis();
+			if(now>stop_ts_){
+				ret=true;
+			}
 		}
 	}
 	return ret;
@@ -41,6 +42,7 @@ void Receiver::Process(){
 		return ;
 	}
 	if(session_connected_){
+		uint32_t now=rtc::TimeMillis();
 		uint32_t delta=100;
 		if(rtt_!=0){
 			delta=rtt_;
@@ -56,25 +58,26 @@ void Receiver::Process(){
 	ret=su_udp_recv(fd_,&remote,rstream.data,rstream.size,0);
 	if(ret>0){
 		if(!session_connected_){
+			uint32_t now=rtc::TimeMillis();
+			session_connected_=true;
 			memcpy(&dst_,&remote,sizeof(su_addr));
 		}
-		memcpy(&dst,&remote,sizeof(su_addr));
 		rstream.used=ret;
 		ProcessingMsg(&rstream);
 	}
 	bin_stream_destroy(&rstream);
 }
-bool Receiver::SendTransportFeedback(rtcp::TransportFeedback* packet){
-	packet->SetSenderSsrc(uid);
+bool Receiver::SendTransportFeedback(webrtc::rtcp::TransportFeedback* packet){
+	packet->SetSenderSsrc(uid_);
 	rtc::Buffer serialized= packet->Build();
 	sim_header_t header;
 	sim_feedback_t feedback;
-    uint32_t payload_size=serialized.size();
+    	uint32_t payload_size=serialized.size();
 	if (payload_size > SIM_FEEDBACK_SIZE){
 		printf("feedback size > SIM_FEEDBACK_SIZE\n");
 		return false;
 	}
-	INIT_SIM_HEADER(header, SIM_FEEDBACK, uid);
+	INIT_SIM_HEADER(header, SIM_FEEDBACK, uid_);
 	feedback.base_packet_id =base_seq_;
 	feedback.feedback_size = payload_size;
 	memcpy(feedback.feedback, (uint8_t*)serialized.data(), payload_size);
@@ -144,7 +147,7 @@ void Receiver::SendPing(int64_t now){
 }
 void Receiver::OnRecvSegment(sim_header_t *header,sim_segment_t *seg){
 	ConfigureCongestion();
-	uint32_t now=Simulator::Now().GetMilliSeconds();
+	uint32_t now=rtc::TimeMillis();
 	uint32_t overhead=seg->data_size + SIM_SEGMENT_HEADER_SIZE;
 	webrtc::RTPHeader fakeHeader;
 	fakeHeader.ssrc=header->uid;
@@ -158,13 +161,13 @@ void Receiver::OnRecvSegment(sim_header_t *header,sim_segment_t *seg){
 }
 void Receiver::OnRecvPad(sim_header_t *header,sim_pad_t *body){
 	uint32_t now=rtc::TimeMillis();
-	uint8_t header_len=sizeof(sim_header_t)+sizeof(sim_pad_t);
+	uint32_t header_len=sizeof(sim_header_t)+sizeof(sim_pad_t);
 	uint32_t overhead=body->data_size + header_len;
 	ConfigureCongestion();
 	webrtc::RTPHeader fakeHeader;
-	fakeHeader.ssrc=header.uid;
+	fakeHeader.ssrc=header->uid;
 	fakeHeader.extension.hasTransportSequenceNumber=true;
-	fakeHeader.extension.transportSequenceNumber=body.transport_seq;
+	fakeHeader.extension.transportSequenceNumber=body->transport_seq;
 	receive_side_cc_->OnReceivedPacket(now,overhead,fakeHeader);
 
 }
