@@ -48,7 +48,7 @@ public:
 private:
 	sim_segment_t* get_segment_t(uint16_t sequence_number);
 	void SendSegment(sim_segment_t *seg,uint32_t now);
-	int SendPadding(uint16_t payload_len,uint32_t ts);
+	int SendPadding(uint16_t payload_len,uint32_t ts,const webrtc::PacedPacketInfo& pacing_info);
 	void SendToNetwork(uint8_t*data,uint32_t len);
 	void ProcessingMsg(bin_stream_t *stream);
 	void InnerProcessFeedback(sim_feedback_t* feedback);

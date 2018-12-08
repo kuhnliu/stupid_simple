@@ -43,6 +43,7 @@ void Sender::Start(){
 	running_=true;
 	if(!pacer_){
 		pacer_=new webrtc::PacedSender(clock_,this,&m_nullLog);
+		pacer_->SetEstimatedBitrate(kInitialBitrateBps);
 	}
 	cc_=absl::make_unique<webrtc::SendSideCongestionController>(
 		      clock_, this /* observer */, &m_nullLog, pacer_);
@@ -55,7 +56,8 @@ void Sender::Start(){
 	pm_->RegisterModule(cc_.get(), RTC_FROM_HERE);
 	pm_->Start();
 	if(encoder_){
-		encoder_->Start();
+		encoder_->SetMinRate(kInitialBitrateBps);
+		encoder_->Start();		
 	}
 }
 void Sender::Stop(){
@@ -180,7 +182,7 @@ bool Sender::TimeToSendPacket(uint32_t ssrc,
 		SendSegment(seg,now);
 		uint16_t overhead=seg->data_size+SIM_SEGMENT_HEADER_SIZE;
 		if(cc_){
-		cc_->AddPacket(uid_,sequence_number,overhead,webrtc::PacedPacketInfo());
+		cc_->AddPacket(uid_,sequence_number,overhead,cluster_info);
 		rtc::SentPacket sentPacket((int64_t)sequence_number,now);
 		cc_->OnSentPacket(sentPacket);
 		}
@@ -189,7 +191,7 @@ bool Sender::TimeToSendPacket(uint32_t ssrc,
 	return ret;
 }
 #define MAX_PAD_SIZE 500
-int  Sender::SendPadding(uint16_t payload_len,uint32_t ts){
+int  Sender::SendPadding(uint16_t payload_len,uint32_t ts,const webrtc::PacedPacketInfo& pacing_info){
     sim_header_t header;
 	sim_pad_t pad;
 	uint32_t header_len=sizeof(sim_header_t)+sizeof(sim_pad_t);
@@ -203,7 +205,7 @@ int  Sender::SendPadding(uint16_t payload_len,uint32_t ts){
 	sim_encode_msg(&stream_, &header, &pad);
 	SendToNetwork(stream_.data,stream_.used);
 	if(cc_){
-    cc_->AddPacket(uid_,sequence_number,overhead,webrtc::PacedPacketInfo());
+    cc_->AddPacket(uid_,sequence_number,overhead,pacing_info);
     rtc::SentPacket sentPacket((int64_t)sequence_number,ts);
     cc_->OnSentPacket(sentPacket);
     }
@@ -219,12 +221,12 @@ size_t Sender::TimeToSendPadding(size_t bytes,
 		while(remain>0)
 		{
 			if(remain>=MAX_PAD_SIZE){
-				int ret=SendPadding(MAX_PAD_SIZE,now);
+				int ret=SendPadding(MAX_PAD_SIZE,now,cluster_info);
 				remain-=ret;
 			}
 			else{
 				if(remain>=100){
-					SendPadding(remain,now);
+					SendPadding(remain,now,cluster_info);
 				}
 				if(remain>0){
 					remain=0;

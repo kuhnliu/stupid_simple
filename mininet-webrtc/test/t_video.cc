@@ -15,7 +15,8 @@ int main(){
 	signal(SIGTSTP, signal_exit_handler);
 	rtc::TaskQueue task_queue("test");
 	uint32_t bw=1000000;
-	zsy::VideoGenerator source(&task_queue,25,bw);
+	zsy::VideoGenerator source(&task_queue,25);
+	source.SetMinRate(bw);
 	zsy::TestSender sender(&source);
 	uint32_t now=rtc::TimeMillis();
 	uint32_t Stop=now+runTime;

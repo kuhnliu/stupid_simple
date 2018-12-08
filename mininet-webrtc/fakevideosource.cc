@@ -1,12 +1,11 @@
 #include "fakevideosource.h"
 #include <unistd.h>
+#include <stdio.h>
 #include "rtc_base/timeutils.h"
 namespace zsy{
-VideoGenerator::VideoGenerator(rtc::TaskQueue *w,uint32_t fs,uint32_t minR){
+VideoGenerator::VideoGenerator(rtc::TaskQueue *w,uint32_t fs){
 	w_=w;
 	fs_=fs;
-	rate_=minR;
-	minR_=minR;
 }
 void VideoGenerator::Start(){
 	running_=true;
@@ -18,15 +17,18 @@ void VideoGenerator::Stop(){
 void VideoGenerator::RegisterSender(SendInterface *sender){
 	sender_=sender;
 }
+void VideoGenerator::SetMinRate(uint32_t minR){
+	minR_=minR;
+	rate_=minR_;
+}
 void VideoGenerator::ChangeRate(uint32_t bitrate){
 	if(bitrate>minR_){
 		rate_=bitrate;
 	}else{
 		rate_=minR_;	
 	}
-	if(log_enable_){
-		LogRate(rate_);
-	}
+	LogRate(rate_);
+
 }
 void VideoGenerator::SetLogFile(std::string name){
 	char buf[FILENAME_MAX];
@@ -42,6 +44,9 @@ void VideoGenerator::Close(){
 	}
 }
 void VideoGenerator::SendFrame(){
+	if(rate_==0){
+		return;
+	}
 	float len=(float)rate_/(fs_ * 8.f);
 	uint32_t bytesToSend=len;
 	if(sender_){
@@ -68,9 +73,14 @@ void VideoGenerator::LogRate(uint32_t bitrate){
 	time_rate_t record;
 	record.now=abs;
 	record.bps=bitrate;
+	if(log_enable_){
 	w_->PostTask([this,record]{
 		this->WriteToFile(record);
 	});
+	}else{
+		printf("%d %16d\n",record.now,record.bps/1000);
+	}
+
 }
 void VideoGenerator::WriteToFile(time_rate_t record){
 	if(f_rate_.is_open()){
@@ -78,7 +88,7 @@ void VideoGenerator::WriteToFile(time_rate_t record){
 		memset(line,0,256);
 		uint32_t abs=record.now;
 		float kbps=(float)record.bps/1000.0;
-		sprintf (line, "%d,%16f",abs,kbps);
+		sprintf (line, "%d %16f",abs,kbps);
 		f_rate_<<line<<std::endl;
 	}
 }

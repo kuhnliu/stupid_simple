@@ -20,8 +20,7 @@ int main(){
 	signal(SIGINT, signal_exit_handler);
 	signal(SIGTSTP, signal_exit_handler);
 	rtc::TaskQueue task_queue("test");
-	uint32_t minR=500000;
-	zsy::VideoGenerator source(&task_queue,25,minR);
+	zsy::VideoGenerator source(&task_queue,25);
 	zsy::Sender sender;
 	sender.SetEncoder(&source);
 	sender.Bind(ip,port);
@@ -29,7 +28,7 @@ int main(){
 	uint32_t now=rtc::TimeMillis();
 	uint32_t Stop=now+runTime;
 	std::string name("webrtc");
-	source.SetLogFile(name);
+	//source.SetLogFile(name);
 	sender.Start();
 	while(run_status){
 		sender.Process();

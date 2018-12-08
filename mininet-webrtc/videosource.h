@@ -9,6 +9,7 @@ public:
 	virtual void Stop()=0;
 	virtual void ChangeRate(uint32_t bitrate)=0;
 	virtual void RegisterSender(SendInterface *s)=0;
+	virtual void SetMinRate(uint32_t min)=0;
 };
 }
 

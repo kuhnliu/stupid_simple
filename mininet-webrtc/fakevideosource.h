@@ -15,13 +15,14 @@ uint32_t bps;
 }time_rate_t;
 class VideoGenerator:public VideoSource{
 public:
-	VideoGenerator(rtc::TaskQueue *w,uint32_t fs,uint32_t minR);
+	VideoGenerator(rtc::TaskQueue *w,uint32_t fs);
 	~VideoGenerator() override{
 	Close();
 	}
 	void Start() override;
 	void Stop() override;
 	void RegisterSender(SendInterface *sender) override;
+	void SetMinRate(uint32_t minR) override;
 	void ChangeRate(uint32_t bitrate) override;
 	void SendFrame();
 	void Generate();
@@ -32,7 +33,7 @@ private:
 	void Close();
 	rtc::TaskQueue *w_;
 	uint32_t fs_;
-	uint32_t rate_;
+	uint32_t rate_{0};
 	uint32_t minR_;
 	bool running_{false};
 	SendInterface* sender_{NULL};
