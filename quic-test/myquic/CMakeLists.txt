@@ -1,0 +1,8 @@
+include_directories(${CMAKE_SOURCE_DIR}/net)
+set(frame_FILES
+my_quic_framer.cc
+quic_framer_visitor.cc
+my_quic_sender.cc
+my_quic_receiver.cc
+)
+add_library(framer STATIC ${frame_FILES})

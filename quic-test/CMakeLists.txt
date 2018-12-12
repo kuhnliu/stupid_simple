@@ -11,12 +11,18 @@ include_directories(/home/zsy/posix_quic-master/libquic/)
 LINK_DIRECTORIES(/home/zsy/posix_quic-master/build/libquic/)
 LINK_DIRECTORIES(/home/zsy/posix_quic-master/build/libquic/third_party/boringssl/src/ssl)
 LINK_DIRECTORIES(/home/zsy/posix_quic-master/build/libquic/third_party/boringssl/src/crypto)
+include_directories(myquic)
+add_subdirectory(myquic)
+include_directories(net)
+add_subdirectory(net)
+set(EXECUTABLE_NAME "t_recv_manager")
+add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_recv_packet_manager.cc)
+target_link_libraries(${EXECUTABLE_NAME} framer quic crypto ssl net pthread)
 
-set(frame_FILES
-my_quic_framer.cc
-quic_framer_visitor.cc
-)
-add_library(framer STATIC ${frame_FILES})
-set(EXECUTABLE_NAME "t_recv")
-add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/t_recv_packet_manager.cc)
-target_link_libraries(${EXECUTABLE_NAME} framer quic crypto ssl pthread)
+set(EXECUTABLE_NAME "t_sender")
+add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_sender.cc)
+target_link_libraries(${EXECUTABLE_NAME} framer quic crypto ssl net pthread)
+
+set(EXECUTABLE_NAME "t_receiver")
+add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_receiver.cc)
+target_link_libraries(${EXECUTABLE_NAME} framer quic crypto ssl net pthread)
