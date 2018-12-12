@@ -26,3 +26,5 @@ target_link_libraries(${EXECUTABLE_NAME} framer quic crypto ssl net pthread)
 set(EXECUTABLE_NAME "t_receiver")
 add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_receiver.cc)
 target_link_libraries(${EXECUTABLE_NAME} framer quic crypto ssl net pthread)
+
+#find . -name '*.log' -type f -print -exec rm -rf {} 
