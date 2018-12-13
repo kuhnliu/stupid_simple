@@ -23,11 +23,8 @@ public:
 	void set_socket(zsy::Socket *socket) { socket_=socket;}
 	void set_peer(su_addr peer) { peer_=peer; }
 private:
-	bool OnPacketSent(SerializedPacket* serialized_packet,
-	                  QuicPacketNumber original_packet_number,
-	                  QuicTime sent_time,
-	                  TransmissionType transmission_type,
-	                  HasRetransmittableData has_retransmittable_data);
+	void OnPacketSent(QuicPacketNumber packet_number,
+                   QuicPacketNumberLength packet_number_length, QuicPacketLength encrypted_length);
 	void SendFakePacket();
 	Perspective pespective_;
 	MyQuicClock clock_;
@@ -40,6 +37,7 @@ private:
 	uint32_t seq_{1};
 	uint32_t counter_{0};
 	QuicTime next_;
+	QuicTime stop_;
 };
 }
 

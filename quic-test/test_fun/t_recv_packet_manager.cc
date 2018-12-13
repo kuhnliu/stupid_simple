@@ -20,9 +20,9 @@ QuicConnectionStats stats;
 QuicReceivedPacketManager manager(&stats);
 int i=0;
 QuicPacketHeader header;
-for(i=0;i<10;i++){
-	header.packet_number=(i+1);
-        if(i==5){
+for(i=0;i<20;i++){
+	header.packet_number=i;
+        if(i==5||i==8){
           continue;
 	}
 	QuicTime offset=now+
