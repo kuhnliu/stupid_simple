@@ -2,6 +2,9 @@
 #include "my_quic_header.h"
 #include "net/quic/core/quic_data_reader.h"
 #include "net/quic/core/quic_data_writer.h"
+#include "net/quic/core/frames/quic_stream_frame.h"
+#include "net/quic/core/frames/quic_frame.h"
+#include "net/quic/core/quic_pending_retransmission.h"
 #include "my_quic_framer.h"
 #include <memory.h>
 #include <iostream>
@@ -39,10 +42,10 @@ MyQuicSender::MyQuicSender(Perspective pespective)
 ,time_of_last_received_packet_(clock_.ApproximateNow())
 ,next_(QuicTime::Zero())
 ,stop_(QuicTime::Zero()){
+	sent_packet_manager_.SetHandshakeConfirmed();
 	 versions_.push_back(ParsedQuicVersion(PROTOCOL_QUIC_CRYPTO, QUIC_VERSION_43));
 }
 void MyQuicSender::OnIncomingData(uint8_t *data,int len){
-	std::cout<<"len "<<len<<std::endl;
 	QuicTime now=clock_.Now();
 	time_of_last_received_packet_=now;
 	char buf[kMaxPacketSize]={0};
@@ -52,19 +55,13 @@ void MyQuicSender::OnIncomingData(uint8_t *data,int len){
 	framer.set_visitor(this);
 	QuicPacketHeader header;// no use
 	framer.ProcessFrameData(&reader,header);
-	bool pending=sent_packet_manager_.HasPendingRetransmissions();
-	//<<sent_packet_manager_.GetLeastUnacked()
-	std::cout<<"pending "<<pending<<std::endl;	
-
 	return ;
 }
 bool MyQuicSender::OnAckFrame(const QuicAckFrame& frame){
-	std::cout<<"should not happen"<<std::endl;
 	return false;
 }
 bool MyQuicSender::OnAckFrameStart(QuicPacketNumber largest_acked,
 	                 QuicTime::Delta ack_delay_time){
-	std::cout<<"largest "<<largest_acked<<std::endl;
 	sent_packet_manager_.OnAckFrameStart(largest_acked,ack_delay_time,
 			time_of_last_received_packet_);
 	return true;
@@ -73,24 +70,23 @@ bool MyQuicSender::OnAckRange(QuicPacketNumber start,
 	            QuicPacketNumber end,
 	            bool last_range){
 	sent_packet_manager_.OnAckRange(start, end);
-	std::cout<<"s "<<start<<" e "<<end<<std::endl;
 	if (!last_range) {
 	    return true;
 	  }
 	  bool acked_new_packet =
 	      sent_packet_manager_.OnAckFrameEnd(time_of_last_received_packet_);
-	  std::cout<<"end "<<std::endl;
 	  return true;
 }
 bool MyQuicSender::Process(){
 	bool ret=true;
 	QuicTime now=clock_.Now();
-	if(now>next_){
-		if(counter_<30){
+	{
+	if(counter_<40){
+		if(sent_packet_manager_.TimeUntilSend(now)==QuicTime::Delta::Zero()){
 		SendFakePacket();
-		next_=now+QuicTime::Delta::FromMilliseconds(10);
 		counter_++;
 		}
+	}
 	}
 	int recv=0;
 	su_addr remote;
@@ -109,12 +105,19 @@ bool MyQuicSender::Process(){
 			ret=false;
 		}
 	}
+	SendRetransmission();
 	return ret;
 }
 void MyQuicSender::OnPacketSent(QuicPacketNumber packet_number,
                    QuicPacketNumberLength packet_number_length, QuicPacketLength encrypted_length){
 	QuicTime now=clock_.Now();
 	SerializedPacket info(packet_number,packet_number_length,NULL,encrypted_length,false,false);
+	bool retransmittable =HAS_RETRANSMITTABLE_DATA;
+	if (retransmittable == HAS_RETRANSMITTABLE_DATA) {
+		QuicStreamFrame *stream=new QuicStreamFrame();
+      		info.retransmittable_frames.push_back(
+         	 QuicFrame(stream));
+    	}
 	sent_packet_manager_.OnPacketSent(&info,0,now, NOT_RETRANSMISSION,HAS_RETRANSMITTABLE_DATA);
 
 }
@@ -134,6 +137,40 @@ void MyQuicSender::SendFakePacket(){
 	uint16_t payload=kMaxPacketSize-header.seq_len;
 	OnPacketSent(header.seq,(QuicPacketNumberLength)header.seq_len,payload);
 	
+}
+void MyQuicSender::SendRetransmission(){
+	QuicTime now=clock_.Now();
+	while(sent_packet_manager_.TimeUntilSend(now)==QuicTime::Delta::Zero()){
+		if(sent_packet_manager_.HasPendingRetransmissions()){
+			QuicPendingRetransmission pending=sent_packet_manager_.NextPendingRetransmission();
+			OnRetransPacket(pending);
+		}else{
+			break;
+		}
+	}
+	return ;
+}
+void MyQuicSender::OnRetransPacket(QuicPendingRetransmission pending){
+	char buf[kMaxPacketSize]={0};
+	my_quic_header_t header;
+	header.seq=seq_;
+	header.seq_len=GetMinSeqLength(header.seq);
+	uint8_t public_flags=0;
+	public_flags |= GetPacketNumberFlags(header.seq_len)
+                  << kPublicHeaderSequenceNumberShift;
+	QuicDataWriter writer(kMaxPacketSize, buf, NETWORK_BYTE_ORDER);
+	writer.WriteBytes(&public_flags,1);
+	writer.WriteBytesToUInt64(header.seq_len,seq_);
+	seq_++;
+	socket_->SendTo(&peer_,(uint8_t*)buf,kMaxPacketSize);
+	uint16_t payload=kMaxPacketSize-header.seq_len;
+	QuicTime now=clock_.Now();
+	SerializedPacket info(header.seq,(QuicPacketNumberLength)header.seq_len,NULL,payload,false,false);
+	for(const QuicFrame& frame : pending.retransmittable_frames){
+		info.retransmittable_frames.push_back(frame);
+	}
+	uint64_t old_seq=pending. packet_number;
+	sent_packet_manager_.OnPacketSent(&info,old_seq,now,LOSS_RETRANSMISSION,HAS_RETRANSMITTABLE_DATA);
 }
 }
 

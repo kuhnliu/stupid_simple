@@ -59,7 +59,7 @@ bool MyQuicReceiver::Process(){
 		}
 		OnIncomingPacket(buf,recv);
 	}
-	if(counter_>20){
+	if(counter_>30){
 		ret=false;
 	}
 	return ret;

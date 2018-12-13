@@ -227,6 +227,7 @@ MyQuicFramer::MyQuicFramer(const ParsedQuicVersionVector& supported_versions,
       data_producer_(nullptr),
       use_incremental_ack_processing_(
           GetQuicReloadableFlag(quic_use_incremental_ack_processing3)) {
+  use_incremental_ack_processing_=true;
   if (use_incremental_ack_processing_) {
     QUIC_FLAG_COUNT(quic_reloadable_flag_quic_use_incremental_ack_processing3);
   }
@@ -234,7 +235,6 @@ MyQuicFramer::MyQuicFramer(const ParsedQuicVersionVector& supported_versions,
   version_ = supported_versions_[0];
   decrypter_ = QuicMakeUnique<NullDecrypter>(perspective);
   encrypter_[ENCRYPTION_NONE] = QuicMakeUnique<NullEncrypter>(perspective);
-  use_incremental_ack_processing_=true;
 }
 
 MyQuicFramer::~MyQuicFramer() {}

@@ -3,6 +3,7 @@
 #include "net/quic/core/quic_sent_packet_manager.h"
 #include "net/quic/core/quic_connection_stats.h"
 #include "net/quic/core/quic_versions.h"
+#include "net/quic/core/quic_pending_retransmission.h"
 #include "my_quic_framer.h"
 #include "my_quic_clock.h"
 #include "quic_framer_visitor.h"
@@ -26,6 +27,8 @@ private:
 	void OnPacketSent(QuicPacketNumber packet_number,
                    QuicPacketNumberLength packet_number_length, QuicPacketLength encrypted_length);
 	void SendFakePacket();
+	void SendRetransmission();
+	void OnRetransPacket(QuicPendingRetransmission pending);
 	Perspective pespective_;
 	MyQuicClock clock_;
 	QuicConnectionStats stats_;
