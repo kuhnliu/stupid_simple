@@ -8,9 +8,10 @@ namespace net{
 class MyQuicReceiver{
 public:
 	MyQuicReceiver();
-	void OnIncomingPacket(char* data,int len);
+	void OnIncomingData(char *data, int len);
 	bool Process();
 	void set_socket(zsy::Socket *socket) { socket_=socket;}
+	void set_duration(uint32_t ms){ duration_=ms;}
 private:
 	void SendAck();
 	bool first_{true};
@@ -22,6 +23,9 @@ private:
 	MyQuicClock clock_;
 	ParsedQuicVersionVector  versions_;
 	bool ack_sent_{false};
+	uint64_t seq_{1};
+	QuicTime stop_;
+	uint32_t duration_{0};
 };
 }
 

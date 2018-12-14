@@ -7,43 +7,42 @@
 #include <iostream>
 namespace net{
 const uint8_t kPublicHeaderSequenceNumberShift = 4;
-QuicPacketNumberLength ReadSequenceNumberLength(uint8_t flags) {
-  switch (flags & PACKET_FLAGS_8BYTE_PACKET) {
-    case PACKET_FLAGS_8BYTE_PACKET:
-      return PACKET_6BYTE_PACKET_NUMBER;
-    case PACKET_FLAGS_4BYTE_PACKET:
-      return PACKET_4BYTE_PACKET_NUMBER;
-    case PACKET_FLAGS_2BYTE_PACKET:
-      return PACKET_2BYTE_PACKET_NUMBER;
-    case PACKET_FLAGS_1BYTE_PACKET:
-      return PACKET_1BYTE_PACKET_NUMBER;
-    default:
-      return PACKET_6BYTE_PACKET_NUMBER;
-  }
-}
-MyQuicReceiver::MyQuicReceiver():recv_packet_manager_(&stats_){
+MyQuicReceiver::MyQuicReceiver()
+:recv_packet_manager_(&stats_)
+,stop_(QuicTime::Zero()){
 	versions_.push_back(ParsedQuicVersion( PROTOCOL_QUIC_CRYPTO, QUIC_VERSION_43));
 }
-void MyQuicReceiver::OnIncomingPacket(char *data,int len){
+void MyQuicReceiver::OnIncomingData(char *data,int len){
 	QuicDataReader reader(data,len, NETWORK_BYTE_ORDER);
 	my_quic_header_t header;
 	uint8_t public_flags=0;
 	reader.ReadBytes(&public_flags,1);
 	header.seq_len= ReadSequenceNumberLength(
-        public_flags >> kPublicHeaderSequenceNumberShift);	
+        public_flags >> kPublicHeaderSequenceNumberShift);
 	uint64_t seq=0;
 	reader.ReadBytesToUInt64(header.seq_len,&seq);
-	//std::cout<<"recv "<<len<<" seq "<<seq<<std::endl;
-	QuicTime now=clock_.Now();
-	QuicPacketHeader fakeheader;
-	fakeheader.packet_number=seq;
-	if(seq==5||seq==9){
-		std::cout<<"overlook "<<seq<<std::endl;
-	}else{
-	  recv_packet_manager_.RecordPacketReceived(fakeheader,now);
+	//uint32_t header_len=sizeof(uint8_t)+header.seq_len;
+	uint8_t type=0;
+	reader.ReadBytes(&type,1);
+	if(type==STREAM_FRAME){
+		QuicTime now=clock_.Now();
+		QuicPacketHeader fakeheader;
+		fakeheader.packet_number=seq;
+		/*if(seq==5||seq==9){
+			std::cout<<"overlook "<<seq<<std::endl;
+		}else*/{
+		  //std::cout<<"recv "<<seq<<std::endl;
+		  recv_packet_manager_.RecordPacketReceived(fakeheader,now);
+		}
+		SendAck();
+		counter_++;
 	}
-	SendAck();
-	counter_++;
+	if(type==STOP_WAITING_FRAME){
+		QuicPacketNumber least_unack;
+		reader.ReadBytesToUInt64(header.seq_len,&least_unack);
+		recv_packet_manager_.DontWaitForPacketsBefore(least_unack);
+		//std::cout<<"stop waititng "<<least_unack<<std::endl;
+	}
 }
 bool MyQuicReceiver::Process(){
 	bool ret=true;
@@ -52,30 +51,45 @@ bool MyQuicReceiver::Process(){
 	su_addr remote;
 	int recv=0;
 	recv=socket_->RecvFrom(&remote,(uint8_t*)buf,max_len);
+	QuicTime now=clock_.Now();
 	if(recv>0){
+		OnIncomingData(buf,recv);
 		if(first_){
 			peer_=remote;
 			first_=false;
+			stop_=now+QuicTime::Delta::FromMilliseconds(duration_);
 		}
-		OnIncomingPacket(buf,recv);
 	}
-	if(counter_>30){
-		ret=false;
+	if(!first_){
+		if(now>stop_){
+			ret=false;
+		}
 	}
 	return ret;
 }
 void MyQuicReceiver::SendAck(){
-	if(counter_>7/*&&!ack_sent_*/){
+	/*if(counter_>7&&ack_sent_)*/{
 	QuicTime approx=clock_.Now();
 	QuicFrame frame=recv_packet_manager_.GetUpdatedAckFrame(approx);
 	QuicAckFrame ackframe(*frame.ack_frame);
  	char buffer[kMaxPacketSize];
- 	uint32_t packet_length=kMaxPacketSize;
- 	QuicDataWriter writer(packet_length, buffer, NETWORK_BYTE_ORDER);
+	my_quic_header_t header;
+	header.seq=seq_;
+	header.seq_len=GetMinSeqLength(header.seq);
+	uint8_t public_flags=0;
+	public_flags |= GetPacketNumberFlags(header.seq_len)
+                  << kPublicHeaderSequenceNumberShift;
+
+	uint32_t header_len=sizeof(uint8_t)+header.seq_len;
+	QuicDataWriter header_writer(header_len,buffer,NETWORK_BYTE_ORDER);
+	header_writer.WriteBytes(&public_flags,1);
+	header_writer.WriteBytesToUInt64(header.seq_len,seq_);
+ 	uint32_t packet_length=kMaxPacketSize-header_len;
+ 	QuicDataWriter writer(packet_length, buffer+header_len, NETWORK_BYTE_ORDER);
 	MyQuicFramer framer(versions_,approx,Perspective::IS_CLIENT);
  	framer.AppendAckFrameAndTypeByte(ackframe,&writer);
-	uint32_t length=writer.length();
-	socket_->SendTo(&peer_,(uint8_t*)buffer,length);
+	uint32_t total_len=writer.length()+header_len;
+	socket_->SendTo(&peer_,(uint8_t*)buffer,total_len);
 	ack_sent_=true;	
 	/*
 	QuicPacketHeader header;

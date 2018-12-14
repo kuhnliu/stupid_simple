@@ -1,10 +1,11 @@
 #include <signal.h>
+#include <string>
 #include "my_quic_sender.h"
 using namespace net;
 using namespace zsy;
-static char ip[]="127.0.0.1";
+static char ip[]="10.0.0.1";
 uint16_t port=1234;
-static char addr[]="127.0.0.1:4321";
+static char addr[]="10.0.4.2:4321";
 static int run_status=1;
 void signal_exit_handler(int sig)
 {
@@ -21,6 +22,9 @@ int main(){
 	MyQuicSender sender(Perspective::IS_CLIENT);
 	sender.set_peer(peer);
 	sender.set_socket(&socket);
+	sender.set_duration(20000);
+	std::string name=std::string("quic-bbr");
+	sender.EnableRateRecord(name);
 	while(sender.Process()&&run_status){
 
 	}
