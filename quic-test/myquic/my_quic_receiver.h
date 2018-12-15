@@ -24,6 +24,7 @@ private:
 	ParsedQuicVersionVector  versions_;
 	bool ack_sent_{false};
 	uint64_t seq_{1};
+	uint64_t base_seq_{0};
 	QuicTime stop_;
 	uint32_t duration_{0};
 };

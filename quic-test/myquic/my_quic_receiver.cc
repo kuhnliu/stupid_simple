@@ -33,6 +33,10 @@ void MyQuicReceiver::OnIncomingData(char *data,int len){
 		}else*/{
 		  //std::cout<<"recv "<<seq<<std::endl;
 		  recv_packet_manager_.RecordPacketReceived(fakeheader,now);
+		  if(seq!=base_seq_+1){
+			//std::cout<<"l "<<base_seq_+1<<std::endl;
+		  }
+		  base_seq_=seq;
 		}
 		SendAck();
 		counter_++;

@@ -22,7 +22,7 @@ int main(){
 	MyQuicSender sender(Perspective::IS_CLIENT);
 	sender.set_peer(peer);
 	sender.set_socket(&socket);
-	sender.set_duration(20000);
+	sender.set_duration(100000);
 	std::string name=std::string("quic-bbr");
 	sender.EnableRateRecord(name);
 	while(sender.Process()&&run_status){

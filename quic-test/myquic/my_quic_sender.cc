@@ -108,7 +108,7 @@ bool MyQuicSender::Process(){
 	bool ret=true;
 	QuicTime now=clock_.Now();
 	{
-	if(counter_<60){
+	/*if(counter_<60)*/{
 		if(sent_packet_manager_.TimeUntilSend(now)==QuicTime::Delta::Zero()){
 		SendFakePacket();
 		counter_++;

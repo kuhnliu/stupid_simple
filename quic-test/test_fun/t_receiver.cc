@@ -17,7 +17,7 @@ int main(){
 	socket.Bind(serv_ip,serv_port);
 	MyQuicReceiver receiver;
 	receiver.set_socket(&socket);
-	receiver.set_duration(21000);
+	receiver.set_duration(110000);
 	while(receiver.Process()&&run_status){
 
 	}
