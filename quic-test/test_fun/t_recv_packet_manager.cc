@@ -20,7 +20,7 @@ QuicConnectionStats stats;
 QuicReceivedPacketManager manager(&stats);
 int i=0;
 QuicPacketHeader header;
-for(i=0;i<20;i++){
+for(i=1;i<20;i++){
 	header.packet_number=i;
         if(i==5||i==8){
           continue;

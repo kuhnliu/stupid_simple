@@ -5,5 +5,8 @@ my_quic_framer.cc
 quic_framer_visitor.cc
 my_quic_sender.cc
 my_quic_receiver.cc
+fakevideogenerator.cc
+my_quic_video_sender.cc
+my_quic_utils.cc
 )
 add_library(framer STATIC ${frame_FILES})

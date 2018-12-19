@@ -23,8 +23,13 @@ set(EXECUTABLE_NAME "t_sender")
 add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_sender.cc)
 target_link_libraries(${EXECUTABLE_NAME} framer quic crypto ssl net pthread)
 
+set(EXECUTABLE_NAME "t_video_sender")
+add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_video_sender.cc)
+target_link_libraries(${EXECUTABLE_NAME} framer quic crypto ssl net pthread)
+
 set(EXECUTABLE_NAME "t_receiver")
 add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_receiver.cc)
 target_link_libraries(${EXECUTABLE_NAME} framer quic crypto ssl net pthread)
-
+set(EXECUTABLE_NAME "t_command")
+add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_command.cc)
 #find . -name '*.log' -type f -print -exec rm -rf {} 
