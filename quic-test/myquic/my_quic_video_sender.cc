@@ -24,6 +24,7 @@ MyQuicVideoSender::MyQuicVideoSender(Perspective pespective)
 ,next_rate_update_(QuicTime::Zero()){
 	sent_packet_manager_.SetHandshakeConfirmed();
 	 versions_.push_back(ParsedQuicVersion(PROTOCOL_QUIC_CRYPTO, QUIC_VERSION_43));
+    sent_packet_manager_.SetPacing();
 }
 MyQuicVideoSender::~MyQuicVideoSender(){
 	if(f_rate_.is_open()){
@@ -172,12 +173,12 @@ void MyQuicVideoSender::SendDataOrPadding(){
 	if(pending_queue_.empty()){
 		int64_t bw=sent_packet_manager_.BandwidthEstimate().ToKBitsPerSecond()*1000;
 		int64_t encoder_rate=source_->GetMaxRate();
-		if(bw<encoder_rate){
+		//if(bw<encoder_rate){
 			SendPaddingData();
             //if(bw>encoder_rate){
                  //std::cout<<"bw "<<bw<<" "<<encoder_rate<<std::endl;
             //}
-		}
+		//}
 	}else{
 		SendFakePacket();
 	}

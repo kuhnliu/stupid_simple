@@ -21,9 +21,9 @@ public:
 	}
 	int64_t GetFrame(QuicTime now);
 private:
-	int64_t min_rate_{200000};//500kbps;
-	int64_t rate_{500000};
-	int64_t max_rate_{5000000};//5Mbps;
+	int64_t min_rate_{1000000};//500kbps;
+	int64_t rate_{1000000};
+	int64_t max_rate_{2000000};//5Mbps;
 	int64_t duration_{33};//33ms
 	QuicTime next_;
 };

@@ -35,6 +35,10 @@ void MyQuicSender::EnableRateRecord(std::string name){
 	enable_log_=true;
 	f_rate_.open(path.c_str(), std::fstream::out);
 }
+void MyQuicSender::PrintPacingInfo(){
+    bool using_pacing=sent_packet_manager_.GetPacing();
+    std::cout<<using_pacing<<std::endl;
+}
 void MyQuicSender::RecordRate(QuicTime now){
 	if(!enable_log_){
 		return ;
@@ -47,7 +51,7 @@ void MyQuicSender::RecordRate(QuicTime now){
 	if(now>last_output_){
 		int64_t bw=0;
 		QuicTime::Delta delta=now-ref_time_;
-		int64_t ms=delta.ToMilliseconds();
+		int64_t ms=delta.ToMilliseconds()+offset_;
 		bw=sent_packet_manager_.BandwidthEstimate().ToKBitsPerSecond();
 		if(f_rate_.is_open()){
 			char line [256];

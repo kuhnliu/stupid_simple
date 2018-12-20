@@ -28,6 +28,10 @@ public:
 	void set_peer(su_addr peer) { peer_=peer; }
 	void set_duration(uint32_t ms);
 	void EnableRateRecord(std::string name);
+    void PrintPacingInfo();
+    void SetTimeOffset(int64_t offset){
+        offset_=offset;
+    }
 private:
 	void RecordRate(QuicTime now);
 	void OnPacketSent(QuicPacketNumber packet_number,
@@ -58,6 +62,7 @@ private:
 	QuicTime ref_time_;
 	bool enable_log_{false};
 	std::fstream f_rate_;
+    int64_t offset_{0};
 };
 }
 

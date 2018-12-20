@@ -7,6 +7,16 @@
 #include <iostream>
 namespace net{
 const uint8_t kPublicHeaderSequenceNumberShift = 4;
+const uint64_t mMinReceivedBeforeAckDecimation = 100;
+
+// Wait for up to 10 retransmittable packets before sending an ack.
+const uint64_t mMaxRetransmittablePacketsBeforeAck = 10;
+// Maximum delayed ack time, in ms.
+const int64_t mMaxDelayedAckTimeMs = 25;
+// TCP RFC calls for 1 second RTO however Linux differs from this default and
+// define the minimum RTO to 200ms, we will use the same until we have data to
+// support a higher or lower value.
+static const int64_t mMinRetransmissionTimeMs = 200;
 MyQuicReceiver::MyQuicReceiver()
 :recv_packet_manager_(&stats_)
 ,stop_(QuicTime::Zero()){
@@ -38,8 +48,11 @@ void MyQuicReceiver::OnIncomingData(char *data,int len){
 		  }
 		  base_seq_=seq;
 		}
-		SendAck();
-		counter_++;
+		m_num_packets_received_since_last_ack_sent++;
+		received_++;
+		if(recv_packet_manager_.ack_frame_updated()){
+			MaybeSendAck();
+		}
 	}
 	if(type==STOP_WAITING_FRAME){
 		QuicPacketNumber least_unack;
@@ -69,7 +82,36 @@ bool MyQuicReceiver::Process(){
 			ret=false;
 		}
 	}
+	if(ack_alarm_.IsExpired(clock_.Now())){
+		SendAck();
+	}
 	return ret;
+}
+void MyQuicReceiver::MaybeSendAck()
+{
+    bool should_send = false;
+    if (received_< mMinReceivedBeforeAckDecimation)
+    {
+        should_send = true;
+    }
+    else
+    {
+        if (m_num_packets_received_since_last_ack_sent >= mMaxRetransmittablePacketsBeforeAck)
+        {
+            should_send = true;
+        }
+        else if (!ack_alarm_.IsSet())
+        {
+            uint64_t ack_delay = std::min(mMaxDelayedAckTimeMs, mMinRetransmissionTimeMs / 2);
+            QuicTime next=clock_.Now()+QuicTime::Delta::FromMilliseconds(ack_delay);
+            ack_alarm_.Update(next);
+        }
+    }
+
+    if (should_send)
+    {
+        SendAck();
+    }
 }
 void MyQuicReceiver::SendAck(){
 	/*if(counter_>7&&ack_sent_)*/{
@@ -94,7 +136,8 @@ void MyQuicReceiver::SendAck(){
  	framer.AppendAckFrameAndTypeByte(ackframe,&writer);
 	uint32_t total_len=writer.length()+header_len;
 	socket_->SendTo(&peer_,(uint8_t*)buffer,total_len);
-	ack_sent_=true;	
+	ack_sent_=true;
+	m_num_packets_received_since_last_ack_sent = 0;
 	/*
 	QuicPacketHeader header;
 	char rbuf[kMaxPacketSize]={0};
