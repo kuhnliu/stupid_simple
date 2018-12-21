@@ -72,19 +72,19 @@ h2.cmd("route add default gw 10.0.4.1")
 net.start()
 time.sleep(1)
 client_cmd="./t_sender --log %d --cp %d  --sp %d --duration %d --offset %d "
-server_cmd="./t_receiver --port %d --duration %d "
+server_cmd="./t_receiver --log %d --port %d --duration %d --offset %d"
 client1_cmd=client_cmd%(1,1234,4321,300000,0)
-server1_cmd=server_cmd%(4321,310000)
+server1_cmd=server_cmd%(1,4321,310000,0)
 
 #CLI(net)
 now=time.time()
 second_start=now+30#seconds
 client2_cmd=client_cmd%(2,1235,5321,300000,30000)
-server2_cmd=server_cmd%(5321,310000)
+server2_cmd=server_cmd%(2,5321,310000,30000)
 
 third_start=now+80#seconds
 client3_cmd=client_cmd%(3,1236,6321,300000,80000)
-server3_cmd=server_cmd%(6321,310000)
+server3_cmd=server_cmd%(3,6321,310000,80000)
 
 process=[]
 p2=h2.popen(server1_cmd)

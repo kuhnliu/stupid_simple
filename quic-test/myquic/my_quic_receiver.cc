@@ -5,6 +5,7 @@
 #include "my_quic_framer.h"
 #include "quic_framer_visitor.h"
 #include <iostream>
+#include <unistd.h>
 namespace net{
 const uint8_t kPublicHeaderSequenceNumberShift = 4;
 const uint64_t mMinReceivedBeforeAckDecimation = 100;
@@ -19,8 +20,18 @@ const int64_t mMaxDelayedAckTimeMs = 25;
 static const int64_t mMinRetransmissionTimeMs = 200;
 MyQuicReceiver::MyQuicReceiver()
 :recv_packet_manager_(&stats_)
-,stop_(QuicTime::Zero()){
+,stop_(QuicTime::Zero())
+,ref_time_(QuicTime::Zero())
+,next_output_(QuicTime::Zero()){
 	versions_.push_back(ParsedQuicVersion( PROTOCOL_QUIC_CRYPTO, QUIC_VERSION_43));
+}
+MyQuicReceiver::~MyQuicReceiver(){
+    if(f_rate_.is_open()){
+        f_rate_.close();
+    }
+    if(f_loss_.is_open()){
+        f_loss_.close();
+    }
 }
 void MyQuicReceiver::OnIncomingData(char *data,int len){
 	QuicDataReader reader(data,len, NETWORK_BYTE_ORDER);
@@ -43,13 +54,21 @@ void MyQuicReceiver::OnIncomingData(char *data,int len){
 		}else*/{
 		  //std::cout<<"recv "<<seq<<std::endl;
 		  recv_packet_manager_.RecordPacketReceived(fakeheader,now);
-		  if(seq!=base_seq_+1){
+		  if(seq>base_seq_+1){
+            uint64_t i=0;
+            for(i=base_seq_+1;i<seq;i++){
+                RecordLoss(i);
+            }
 			//std::cout<<"l "<<base_seq_+1<<std::endl;
 		  }
-		  base_seq_=seq;
+		  if(seq>=base_seq_+1){
+			  base_seq_=seq;
+		  }
 		}
 		m_num_packets_received_since_last_ack_sent++;
 		received_++;
+		recv_byte_+=len;
+		RecordRate(now);
 		if(recv_packet_manager_.ack_frame_updated()){
 			MaybeSendAck();
 		}
@@ -70,6 +89,9 @@ bool MyQuicReceiver::Process(){
 	recv=socket_->RecvFrom(&remote,(uint8_t*)buf,max_len);
 	QuicTime now=clock_.Now();
 	if(recv>0){
+	    if(ref_time_==QuicTime::Zero()){
+	        ref_time_=now;
+	    }
 		OnIncomingData(buf,recv);
 		if(first_){
 			peer_=remote;
@@ -150,7 +172,53 @@ void MyQuicReceiver::SendAck(){
 	readframer.ProcessFrameData(&reader,header);*/
 	}
 }
+void MyQuicReceiver::SetRecordPrefix(std::string name){
+    log_prefix_=name;
 }
-
-
-
+void MyQuicReceiver::EnableRateRecord(){
+    enable_rate_record_=true;
+	char buf[FILENAME_MAX];
+	memset(buf,0,FILENAME_MAX);
+	std::string path = std::string (getcwd(buf, FILENAME_MAX))
+			+"/"+log_prefix_+"-rate.txt";
+	f_rate_.open(path.c_str(), std::fstream::out);    
+}
+void MyQuicReceiver::EnableLossRecord(){
+    enable_loss_record_=true;
+	char buf[FILENAME_MAX];
+	memset(buf,0,FILENAME_MAX);
+	std::string path = std::string (getcwd(buf, FILENAME_MAX))
+			+"/"+log_prefix_+"-loss.txt";
+	f_loss_.open(path.c_str(), std::fstream::out); 
+}
+void MyQuicReceiver::RecordLoss(uint64_t seq){
+    if(enable_loss_record_){
+    	QuicTime now=clock_.Now();
+		QuicTime::Delta delta=now-ref_time_;
+		uint64_t abs=delta.ToMilliseconds()+offset_;
+		char line [256];
+		memset(line,0,256);
+		sprintf (line, "%lld %16lld",abs,seq);
+		f_loss_<<line<<std::endl;
+    }
+}
+void MyQuicReceiver::RecordRate(QuicTime now){
+	if(enable_rate_record_){
+		if(next_output_==QuicTime::Zero()){
+			next_output_=now+QuicTime::Delta::FromMilliseconds(500);
+			return;
+		}
+		if(now>next_output_){
+			uint64_t kbps=recv_byte_*8/(500);
+			next_output_=now+QuicTime::Delta::FromMilliseconds(500);
+			recv_byte_=0;
+			QuicTime::Delta delta=now-ref_time_;
+			uint64_t abs=delta.ToMilliseconds()+offset_;
+			char line [256];
+			memset(line,0,256);
+			sprintf (line, "%lld %16lld",abs,kbps);
+			f_rate_<<line<<std::endl;
+		}
+	}
+}
+}
