@@ -80,6 +80,7 @@ public:
 			uint64_t max_bps);
 	~MyBbrSender();
 	QuicBandwidth PaceRate();
+	QuicBandwidth GetReferenceRate();
 	QuicBandwidth BandwidthEstimate();
 	QuicBandwidth AverageBandwidthEstimate();
 	bool ShouldSendProbePacket() const;

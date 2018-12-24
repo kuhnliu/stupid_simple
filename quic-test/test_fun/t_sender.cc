@@ -20,7 +20,7 @@ int main(int argc,char *argv[]){
 	parser.add<int>("sp",'p',"server port",false,4321);
     parser.add<std::string>("log", 'l', "log", false, "1");
     parser.add<int>("duration", 'd', "duration", false, 100000);//100 s
-    parser.add<int>("offset", 'o', "client offset, MilliSeconds", false,0);
+    parser.add<int>("offset", 'o', "time offset, MilliSeconds", false,0);
     parser.parse_check(argc, argv);
     std::string client_ip=parser.get<std::string>("client");
     std::string serv_ip=parser.get<std::string>("server");

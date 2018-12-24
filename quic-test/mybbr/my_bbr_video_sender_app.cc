@@ -1,14 +1,16 @@
-#include "my_bbr_sender_app.h"
+#include "my_bbr_video_sender_app.h"
 #include "my_proto.h"
 #include "net/quic/core/quic_data_reader.h"
 #include "net/quic/core/quic_data_writer.h"
 #include <unistd.h>
 #include "my_quic_header.h"
+#include "my_quic_utils.h"
+#include "fakevideogenerator.h"
 #include <iostream>
 const uint8_t kPublicHeaderSequenceNumberShift = 4;
 const uint32_t MaxPacketSize=1400;
 namespace net{
-MyBbrSenderApp::MyBbrSenderApp(uint64_t min_bps,
+MyBbrVideoSenderApp::MyBbrVideoSenderApp(uint64_t min_bps,
 		uint64_t start_bps,
 		uint64_t max_bps)
 :next_(QuicTime::Zero())
@@ -17,28 +19,35 @@ MyBbrSenderApp::MyBbrSenderApp(uint64_t min_bps,
 ,cc_(min_bps,start_bps,max_bps){
 	pacing_.set_sender(&cc_);
 }
-MyBbrSenderApp::~MyBbrSenderApp(){
+MyBbrVideoSenderApp::~MyBbrVideoSenderApp(){
 	if(f_rate_.is_open()){
 		f_rate_.close();
 	}
 }
-void MyBbrSenderApp::set_duration(uint32_t ms){
+void MyBbrVideoSenderApp::set_duration(uint32_t ms){
     QuicTime now=clock_.Now();
     stop_=now+QuicTime::Delta::FromMilliseconds(ms);
 }
-bool MyBbrSenderApp::Process(){
+bool MyBbrVideoSenderApp::Process(){
 	bool ret=true;
 	QuicTime now=clock_.Now();
 	if(ref_time_==QuicTime::Zero()){
 		ref_time_=now;
 	}
+	int64_t frame_len=source_->GetFrame(now);
+	if(frame_len>0){
+		uint16_t splits[MAX_SPLIT_NUMBER], total=0;
+		int i=0;
+		assert((frame_len/ QUIC_MAX_VIDEO_SIZE) < MAX_SPLIT_NUMBER);
+		total = FrameSplit(splits,frame_len);
+		for(i=0;i<total;i++){
+			int value=splits[i];
+			pending_queue_.push_back(value);
+		}
+	}
 	if(pacing_.TimeUntilSend(now)==QuicTime::Delta::Zero()){
-		SendFakePacket(now);
-	}/*
-    if(sent_count_<20){
-        SendFakePacket(now);//for test;
-        sent_count_++;
-    }*/
+		SendDataOrPadding(now);
+	}
 	int recv=0;
 	su_addr remote;
 	uint32_t max_len=1500;
@@ -55,7 +64,7 @@ bool MyBbrSenderApp::Process(){
 	RecordRate(now);
 	return ret;
 }
-void MyBbrSenderApp::EnableRateRecord(std::string name){
+void MyBbrVideoSenderApp::EnableRateRecord(std::string name){
 	char buf[FILENAME_MAX];
 	memset(buf,0,FILENAME_MAX);
 	std::string path = std::string (getcwd(buf, FILENAME_MAX))
@@ -63,7 +72,7 @@ void MyBbrSenderApp::EnableRateRecord(std::string name){
 	enable_log_=true;
 	f_rate_.open(path.c_str(), std::fstream::out);
 }
-void MyBbrSenderApp::RecordRate(QuicTime now){
+void MyBbrVideoSenderApp::RecordRate(QuicTime now){
 	if(next_==QuicTime::Zero()){
 		next_=now+QuicTime::Delta::FromMilliseconds(100);
 		return;
@@ -72,7 +81,7 @@ void MyBbrSenderApp::RecordRate(QuicTime now){
 		int64_t bw=0;
 		QuicTime::Delta delta=now-ref_time_;
 		int64_t ms=delta.ToMilliseconds()+offset_;
-		bw=cc_.GetReferenceRate().ToKBitsPerSecond();
+		bw=cc_.BandwidthEstimate().ToKBitsPerSecond();
 		if(f_rate_.is_open()){
 			char line [256];
 			memset(line,0,256);
@@ -82,7 +91,16 @@ void MyBbrSenderApp::RecordRate(QuicTime now){
 		next_=now+QuicTime::Delta::FromMilliseconds(100);
 	}
 }
-void MyBbrSenderApp::SendFakePacket(QuicTime now){
+void MyBbrVideoSenderApp::SendDataOrPadding(QuicTime now){
+	if(pending_queue_.empty()){
+		if(cc_.ShouldSendProbePacket()){
+			SendPaddingPacket(now);
+		}
+	}else{
+		SendFakePacket(now);
+	}
+}
+void MyBbrVideoSenderApp::SendFakePacket(QuicTime now){
 	char buf[MaxPacketSize]={0};
 	my_quic_header_t header;
 	header.seq=seq_;
@@ -100,7 +118,25 @@ void MyBbrSenderApp::SendFakePacket(QuicTime now){
 	uint16_t payload=MaxPacketSize-(1+header.seq_len);
 	pacing_.OnPacketSent(now,header.seq,payload);
 }
-void MyBbrSenderApp::ProcessAckFrame(QuicTime now,uint8_t *data,int len){
+void MyBbrVideoSenderApp::SendPaddingPacket(QuicTime now){
+	char buf[MaxPacketSize]={0};
+	my_quic_header_t header;
+	header.seq=seq_;
+	header.seq_len=GetMinSeqLength(header.seq);
+	uint8_t public_flags=0;
+	public_flags |= GetPacketNumberFlags(header.seq_len)
+                  << kPublicHeaderSequenceNumberShift;
+	QuicDataWriter writer(MaxPacketSize, buf, NETWORK_BYTE_ORDER);
+	uint8_t type=TestProto::test_proto_padding;
+	public_flags|=type;
+	writer.WriteBytes(&public_flags,1);
+	writer.WriteBytesToUInt64(header.seq_len,header.seq);
+	seq_++;
+	socket_->SendTo(&peer_,(uint8_t*)buf,kMaxPacketSize);
+	uint16_t payload=MaxPacketSize-(1+header.seq_len);
+	pacing_.OnPacketSent(now,header.seq,payload);
+}
+void MyBbrVideoSenderApp::ProcessAckFrame(QuicTime now,uint8_t *data,int len){
 	char buf[MaxPacketSize]={0};
 	memcpy(buf,data,len);
 	my_quic_header_t header;
@@ -114,7 +150,11 @@ void MyBbrSenderApp::ProcessAckFrame(QuicTime now,uint8_t *data,int len){
 		uint64_t num=0;
 		header_reader.ReadBytesToUInt64(header.seq_len,&num);
 		pacing_.OnCongestionEvent(now,num);
-        //std::cout<<"acked "<<num<<std::endl;
 	}
 }
 }
+
+
+
+
+

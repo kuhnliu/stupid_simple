@@ -173,12 +173,9 @@ void MyQuicVideoSender::SendDataOrPadding(){
 	if(pending_queue_.empty()){
 		int64_t bw=sent_packet_manager_.BandwidthEstimate().ToKBitsPerSecond()*1000;
 		int64_t encoder_rate=source_->GetMaxRate();
-		//if(bw<encoder_rate){
-			SendPaddingData();
-            //if(bw>encoder_rate){
-                 //std::cout<<"bw "<<bw<<" "<<encoder_rate<<std::endl;
-            //}
-		//}
+        if(sent_packet_manager_.GetSendAlgorithm()->ShouldSendProbingPacket()){
+           SendPaddingData(); 
+        }
 	}else{
 		SendFakePacket();
 	}

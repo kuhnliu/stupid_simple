@@ -92,12 +92,12 @@ bool MyQuicReceiver::Process(){
 	    if(ref_time_==QuicTime::Zero()){
 	        ref_time_=now;
 	    }
-		OnIncomingData(buf,recv);
 		if(first_){
 			peer_=remote;
 			first_=false;
 			stop_=now+QuicTime::Delta::FromMilliseconds(duration_);
 		}
+		OnIncomingData(buf,recv);
 	}
 	if(!first_){
 		if(now>stop_){

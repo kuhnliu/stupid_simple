@@ -24,7 +24,7 @@ public:
     void EnableRateRecord();
     void EnableLossRecord();
 private:
-    void OnIncomingStream(char *data, int len);
+    void OnIncomingData(char *data, int len);
     void SendAck(uint64_t packet_number);
     void RecordLoss(uint64_t seq);
     void RecordRate(QuicTime now);

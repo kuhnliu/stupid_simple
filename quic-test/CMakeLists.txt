@@ -38,7 +38,12 @@ add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_command.cc)
 set(EXECUTABLE_NAME "t_bbr_sender")
 add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_bbr_sender.cc)
 target_link_libraries(${EXECUTABLE_NAME} bbr myquic quic crypto ssl net pthread)
+
 set(EXECUTABLE_NAME "t_bbr_receiver")
 add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_bbr_receiver.cc)
+target_link_libraries(${EXECUTABLE_NAME} bbr myquic quic crypto ssl net pthread)
+
+set(EXECUTABLE_NAME "t_bbr_video_sender")
+add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/test_fun/t_bbr_video_sender.cc)
 target_link_libraries(${EXECUTABLE_NAME} bbr myquic quic crypto ssl net pthread)
 #find . -name '*.log' -type f -print -exec rm -rf {} 

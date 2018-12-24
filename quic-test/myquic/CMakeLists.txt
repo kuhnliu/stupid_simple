@@ -1,5 +1,5 @@
 include_directories(${CMAKE_SOURCE_DIR}/net)
-set(frame_FILES
+set(myquic_FILES
 my_quic_header.cc
 my_quic_framer.cc
 quic_framer_visitor.cc
@@ -9,4 +9,4 @@ fakevideogenerator.cc
 my_quic_video_sender.cc
 my_quic_utils.cc
 )
-add_library(framer STATIC ${frame_FILES})
+add_library(myquic STATIC ${myquic_FILES})

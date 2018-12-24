@@ -125,6 +125,14 @@ MyBbrSender::~MyBbrSender(){
 QuicBandwidth MyBbrSender::PaceRate(){
 	return pacing_rate_;
 }
+QuicBandwidth MyBbrSender::GetReferenceRate(){
+	QuicBandwidth min_rate=QuicBandwidth::FromBitsPerSecond(min_bps_);
+	QuicBandwidth bw=max_bandwidth_.GetBest();
+	if(bw<min_rate){
+		bw=min_rate;
+	}
+	return bw;
+}
 QuicBandwidth MyBbrSender::BandwidthEstimate(){
 	return max_bandwidth_.GetBest();
 }

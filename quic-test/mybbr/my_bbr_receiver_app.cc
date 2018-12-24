@@ -40,7 +40,7 @@ bool MyBbrReceiverApp::Process(){
 			first_=false;
 			stop_=now+QuicTime::Delta::FromMilliseconds(duration_);
 		}
-	    OnIncomingStream(buf,recv);
+		OnIncomingData(buf,recv);
 	}
 	if(!first_){
 		if(now>stop_){
@@ -69,7 +69,7 @@ void MyBbrReceiverApp::EnableLossRecord(){
 			+"/"+log_prefix_+"-loss.txt";
 	f_loss_.open(path.c_str(), std::fstream::out);
 }
-void MyBbrReceiverApp::OnIncomingStream(char *data, int len){
+void MyBbrReceiverApp::OnIncomingData(char *data, int len){
 	recv_byte_+=len;
 	QuicDataReader reader(data,len, NETWORK_BYTE_ORDER);
 	my_quic_header_t header;
@@ -78,7 +78,7 @@ void MyBbrReceiverApp::OnIncomingStream(char *data, int len){
 	header.seq_len= ReadSequenceNumberLength(
         public_flags >> kPublicHeaderSequenceNumberShift);
 	uint8_t type=public_flags&0x0F;
-	if(type==TestProto::test_proto_stream){
+	if(type==TestProto::test_proto_stream||type==TestProto::test_proto_padding){
 		uint64_t seq=0;
 		reader.ReadBytesToUInt64(header.seq_len,&seq);
 		SendAck(seq);

@@ -34,7 +34,7 @@ int main(int argc,char *argv[]){
     receiver.SetTimeOffset(offset);
     receiver.SetRecordPrefix(name);
     receiver.EnableRateRecord();
-    //receiver.EnableLossRecord();
+    receiver.EnableLossRecord();
 	while(receiver.Process()&&run_status){
 
 	}
