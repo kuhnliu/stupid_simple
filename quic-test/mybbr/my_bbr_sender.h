@@ -115,6 +115,7 @@ private:
 	void ClusterInfoClear();
 	void RemoveClusterLE(uint64_t round);
 	void AddSeqAndTimestamp(QuicTime now,QuicPacketNumber packet_number);
+	bool HasSampledLastMinRtt();
 	uint64_t min_bps_;
 	uint64_t start_bps_;
 	uint64_t max_bps_;
@@ -125,6 +126,7 @@ private:
 	std::map<QuicPacketNumber,uint64_t> seq_round_map_;
 	std::map<QuicPacketNumber,QuicTime> seq_ts_map_;
 	QuicTime::Delta min_rtt_;
+	QuicTime::Delta recored_min_rtt_;
 	QuicTime min_rtt_timestamp_;
 	QuicTime exit_probe_rtt_at_;
 	QuicBandwidth pacing_rate_;

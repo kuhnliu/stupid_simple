@@ -108,7 +108,7 @@ void MyBbrReceiverApp::SendAck(uint64_t packet_number){
 	writer.WriteBytesToUInt64(header.seq_len,header.seq);
 	uint32_t total_len=writer.length();
 	socket_->SendTo(&peer_,(uint8_t*)buf,total_len);
-    std::cout<<"ack "<<packet_number<<std::endl;
+    //std::cout<<"ack "<<packet_number<<std::endl;
 }
 void MyBbrReceiverApp::RecordLoss(uint64_t seq){
     if(enable_loss_record_){

@@ -30,6 +30,7 @@ SentClusterInfo::~SentClusterInfo(){
 		auto it=packet_infos_.begin();
 		SentPacketInfo *packet_info=(*it);
 		delete packet_info;
+        packet_infos_.erase(it);
 	}
 	std::vector<SentPacketInfo*> null_vec;
 	null_vec.swap(packet_infos_);
@@ -96,16 +97,18 @@ void SentClusterInfo::TriggerBandwidthEstimate(){
 }
 MyBbrSender::MyBbrSender(uint64_t min_bps,
 		uint64_t start_bps,
-		uint64_t max_bps):min_bps_(min_bps),
-start_bps_(start_bps),
-max_bps_(max_bps),
-min_rtt_(QuicTime::Delta::Zero()),
-min_rtt_timestamp_(QuicTime::Zero()),
-exit_probe_rtt_at_(QuicTime::Zero()),
-pacing_rate_(QuicBandwidth::FromBitsPerSecond(start_bps)),
-last_cycle_start_(QuicTime::Zero()),
-max_bandwidth_(kBandwidthWindowSize,QuicBandwidth::Zero(),0),
-avergae_bandwidth_(kAverageAckRateWindowSize,QuicBandwidth::Zero(),0)
+		uint64_t max_bps)
+:min_bps_(min_bps)
+,start_bps_(start_bps)
+,max_bps_(max_bps)
+,min_rtt_(QuicTime::Delta::Zero())
+,recored_min_rtt_(QuicTime::Delta::Zero())
+,min_rtt_timestamp_(QuicTime::Zero())
+,exit_probe_rtt_at_(QuicTime::Zero())
+,pacing_rate_(QuicBandwidth::FromBitsPerSecond(start_bps))
+,last_cycle_start_(QuicTime::Zero())
+,max_bandwidth_(kBandwidthWindowSize,QuicBandwidth::Zero(),0)
+,avergae_bandwidth_(kAverageAckRateWindowSize,QuicBandwidth::Zero(),0)
 ,random_(QuicRandom::GetInstance()){
 
 }
@@ -151,6 +154,7 @@ void MyBbrSender::OnAck(QuicTime event_time,
 	bool min_rtt_expired=false;
 	min_rtt_expired=event_time>(min_rtt_timestamp_ + kMinRttExpiry);
 	MaybeEnterOrExitProbeRtt(event_time,min_rtt_expired);
+    CalculatePacingRate();
 	auto seq_round_it=seq_round_map_.find(packet_number);
 	if(seq_round_it!=seq_round_map_.end()){
 		uint64_t round=seq_round_it->second;
@@ -210,8 +214,8 @@ void MyBbrSender::OnAck(QuicTime event_time,
 			auto acked_clusters_it=acked_clusters_.begin();
 			SentClusterInfo *cluster=(*acked_clusters_it);
 			cluster_id=cluster->GetClusterId();
-			RemoveClusterLE(cluster_id);
 			acked_clusters_.erase(acked_clusters_it);
+            RemoveClusterLE(cluster_id);
 		}
 	}
 }
@@ -227,6 +231,7 @@ void MyBbrSender::OnPacketSent(QuicTime event_time,
 void MyBbrSender::OnEstimateBandwidth(SentClusterInfo *cluster,uint64_t cluter_id,QuicBandwidth bw){
 	acked_clusters_.push_back(cluster);
 	max_bandwidth_.Update(bw,cluter_id);
+    //std::cout<<cluter_id<<" bw "<<bw.ToKBitsPerSecond()<<std::endl;
 }
 void MyBbrSender::UpdateRtt(QuicTime now,
 		QuicPacketNumber packet_number){
@@ -236,13 +241,14 @@ void MyBbrSender::UpdateRtt(QuicTime now,
 		if(min_rtt_==QuicTime::Delta::Zero()){
 			min_rtt_=rtt;
 			min_rtt_timestamp_=now;
-		}
-		if(rtt<min_rtt_){
-			min_rtt_=rtt;
-			min_rtt_timestamp_=now;
-		}
-		if(rtt>min_rtt_&&rtt<=min_rtt_*kSimilarMinRttThreshold){
-			min_rtt_timestamp_=now;
+		}else {
+			if(rtt<min_rtt_){
+				min_rtt_=rtt;
+				min_rtt_timestamp_=now;
+			}
+			if(rtt>min_rtt_&&rtt<=min_rtt_*kSimilarMinRttThreshold){
+				min_rtt_timestamp_=now;
+			}
 		}
 	}
 	while(!seq_ts_map_.empty()){
@@ -285,13 +291,17 @@ void MyBbrSender::MaybeEnterOrExitProbeRtt(QuicTime now,
 	    // is at the target small value.
 	    exit_probe_rtt_at_ = QuicTime::Zero();
 	    round_trip_count_=0;
+	    recored_min_rtt_=min_rtt_;
+	    min_rtt_=QuicTime::Delta::Zero();
+	    seq_ts_map_.clear();
 		ClusterInfoClear();
 	  }
 	if(mode_==PROBE_RTT){
 		if(exit_probe_rtt_at_==QuicTime::Zero()){
 			exit_probe_rtt_at_=now+kProbeRttTime;
 		}
-		if(now>exit_probe_rtt_at_){
+		if(now>exit_probe_rtt_at_||HasSampledLastMinRtt()){
+			recored_min_rtt_=QuicTime::Delta::Zero();
 			EnterProbeBandwidthMode(now);
 		}
 	}
@@ -306,6 +316,9 @@ void MyBbrSender::CalculatePacingRate(){
 		 //QuicBandwidth average_bw=AverageBandwidthEstimate();
 		 target_rate = pacing_gain_*BandwidthEstimate();
 		 pacing_rate_=target_rate;
+         //if(pacing_gain_>1){
+         //   std::cout<<" bw "<<pacing_rate_.ToKBitsPerSecond()<<std::endl;
+         //}
 		 if(pacing_rate_<min_rate){
 			 pacing_rate_=min_rate;
 		 }
@@ -350,18 +363,18 @@ void MyBbrSender::ClusterInfoClear(){
 }
 void MyBbrSender::RemoveClusterLE(uint64_t round){
 	while(!connection_info_.empty()){
+        uint32_t total=connection_info_.size();
 		auto it=connection_info_.begin();
 		uint64_t id=it->first;
 		SentClusterInfo *cluster=NULL;
 		if(id<=round){
-            std::cout<<"round "<<id<<std::endl;
             cluster=it->second;
 			SentClusterInfo *next=cluster->GetNext();
 			if(next){
 				next->SetPrev(NULL);
 			}
-			connection_info_.erase(it);
-			delete cluster;
+            delete cluster;
+			connection_info_.erase(it);	
 		}else{
 			break;
 		}
@@ -369,5 +382,14 @@ void MyBbrSender::RemoveClusterLE(uint64_t round){
 }
 void MyBbrSender::AddSeqAndTimestamp(QuicTime now,QuicPacketNumber packet_number){
 	seq_ts_map_.insert(std::make_pair(packet_number,now));
+}
+bool MyBbrSender::HasSampledLastMinRtt(){
+	bool ret=false;
+	if(min_rtt_!=QuicTime::Delta::Zero()&&recored_min_rtt_!=QuicTime::Delta::Zero()){
+		if(min_rtt_<recored_min_rtt_*kSimilarMinRttThreshold){
+			ret=true;
+		}
+	}
+	return ret;
 }
 }
