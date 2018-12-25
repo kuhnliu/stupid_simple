@@ -58,7 +58,7 @@ crc32(uint32_t crc, const void *buf, size_t size)
 {
 	const uint8_t *p;
 
-	p = buf;
+	p = (uint8_t *)buf;
 	crc = crc ^ ~0U;
 
 	while (size--)

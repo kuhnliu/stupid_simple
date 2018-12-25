@@ -9,7 +9,7 @@ class SendInterface;
 class FakeRtpRtcpImpl:public webrtc::RtpRtcp{
 public:
 	FakeRtpRtcpImpl(SendInterface *sender);
-	~FakeRtpRtcpImpl() override;
+	~FakeRtpRtcpImpl() override{}
 	  // Returns the number of milliseconds until the module want a worker thread to
 	  // call Process.
 	  int64_t TimeUntilNextProcess() override{
@@ -59,7 +59,7 @@ public:
 	  }
 
 	  // Register RTP header extension.
-	  int32_t RegisterSendRtpHeaderExtension(RTPExtensionType type,
+	  int32_t RegisterSendRtpHeaderExtension(webrtc::RTPExtensionType type,
 	                                         uint8_t id) override{
 		  std::cout<<__FUNCTION__<<std::endl;
 		  return 0;
@@ -145,7 +145,7 @@ public:
 		  std::cout<<__FUNCTION__<<std::endl;
 	  }
 	  int RtxSendStatus() const override{
-		  std::cout<<__FUNCTION__<<std::endl;
+		  //std::cout<<__FUNCTION__<<std::endl;
 		  return 0;
 	  }
 
@@ -180,7 +180,8 @@ public:
 	  }
 
 	  bool SendingMedia() const override{
-		  std::cout<<__FUNCTION__<<std::endl;
+		  //std::cout<<__FUNCTION__<<std::endl;
+		return true;
 	  }
 
 	  void SetAsPartOfAllocation(bool part_of_allocation) override{
@@ -189,7 +190,7 @@ public:
 
 	  // Used by the codec module to deliver a video or audio frame for
 	  // packetization.
-	  bool SendOutgoingData(FrameType frame_type,
+	  bool SendOutgoingData(webrtc::FrameType frame_type,
 	                        int8_t payload_type,
 	                        uint32_t time_stamp,
 	                        int64_t capture_time_ms,
@@ -202,30 +203,13 @@ public:
 		  return true;
 	  }
 
-	  bool TimeToSendPacket(uint32_t ssrc,
+		bool TimeToSendPacket(uint32_t ssrc,
 	                        uint16_t sequence_number,
 	                        int64_t capture_time_ms,
 	                        bool retransmission,
-	                        const webrtc::PacedPacketInfo& pacing_info) override{
-		  if(sender_){
-			  return sender_->TimeToSendPacket(ssrc,sequence_number,capture_time_ms,
-					  retransmission,pacing_info);
-		  }else{
-			  return true;
-		  }
-	  }
-
-	  // Returns the number of padding bytes actually sent, which can be more or
-	  // less than |bytes|.
-	  size_t TimeToSendPadding(size_t bytes,
-	                           const webrtc::PacedPacketInfo& pacing_info) override{
-		  if(sender_){
-			  return sender_->TimeToSendPadding(bytes,pacing_info);
-		  }else{
-			  return bytes;
-		  }
-	  }
-
+	                        const webrtc::PacedPacketInfo& pacing_info) override;
+	  	size_t TimeToSendPadding(size_t bytes,
+	                           const webrtc::PacedPacketInfo& pacing_info) override;
 	  // RTCP part.
 
 	  // Get RTCP status.
@@ -277,12 +261,7 @@ public:
 	              int64_t* rtt,
 	              int64_t* avg_rtt,
 	              int64_t* min_rtt,
-	              int64_t* max_rtt) const override{
-		  std::cout<<__FUNCTION__<<std::endl;
-		  if(sender_){
-			  sender_->RTT(rtt,avg_rtt,min_rtt,max_rtt);
-		  }
-	  }
+	              int64_t* max_rtt) const override;
 
 	  // Force a send of an RTCP packet.
 	  // Normal SR and RR are triggered via the process function.
@@ -341,10 +320,6 @@ public:
 		  std::cout<<__FUNCTION__<<std::endl;
 	  }
 
-	  void SetTmmbn(std::vector<webrtc::rtcp::TmmbItem> bounding_set) override{
-		  std::cout<<__FUNCTION__<<std::endl;
-	  }
-
 	  size_t MaxRtpPacketSize() const override{
 		  std::cout<<__FUNCTION__<<std::endl;
 		  return 0;
@@ -393,7 +368,7 @@ public:
 	      webrtc::RtcpStatisticsCallback* callback) override{
 		  std::cout<<__FUNCTION__<<std::endl;
 	  }
-	  RtcpStatisticsCallback* GetRtcpStatisticsCallback() override{
+	  webrtc::RtcpStatisticsCallback* GetRtcpStatisticsCallback() override{
 		  std::cout<<__FUNCTION__<<std::endl;
 		  return NULL;
 	  }
@@ -454,7 +429,6 @@ public:
 
 	  void SetUlpfecConfig(int red_payload_type, int ulpfec_payload_type) override{
 		  std::cout<<__FUNCTION__<<std::endl;
-		  return 0;
 	  }
 
 	  bool SetFecParameters(const webrtc::FecProtectionParams& delta_params,
@@ -473,7 +447,7 @@ public:
 	      webrtc::StreamDataCountersCallback* callback) override{
 		  std::cout<<__FUNCTION__<<std::endl;
 	  }
-	  StreamDataCountersCallback* GetSendChannelRtpStatisticsCallback()
+	  webrtc::StreamDataCountersCallback* GetSendChannelRtpStatisticsCallback()
 	      const override{
 		  std::cout<<__FUNCTION__<<std::endl;
 		  return 0;

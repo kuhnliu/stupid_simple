@@ -46,8 +46,8 @@ public:
              int64_t* avg_rtt,
              int64_t* min_rtt,
              int64_t* max_rtt) override;
-    virtual void OnTargetTransferRate(webrtc::TargetTransferRate) override;
-    virtual void OnStartRateUpdate(webrtc::DataRate) override;
+    virtual void OnTargetTransferRate(webrtc::TargetTransferRate rate) override;
+    virtual void OnStartRateUpdate(webrtc::DataRate rate) override;
 private:
 	sim_segment_t* get_segment_t(uint16_t sequence_number);
 	void SendSegment(sim_segment_t *seg,uint32_t now);

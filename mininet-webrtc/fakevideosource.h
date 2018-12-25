@@ -21,7 +21,7 @@ public:
 	}
 	void Start() override;
 	void Stop() override;
-	void RegisterVideoTaget(VideoFrameTarget *sender) override;
+	void RegisterVideoTarget(VideoFrameTarget *sender) override;
 	void SetMinRate(uint32_t minR) override;
 	void ChangeRate(uint32_t bitrate) override;
 	void SendFrame();

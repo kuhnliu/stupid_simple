@@ -5,7 +5,7 @@
 namespace zsy{
 TestSender::TestSender(VideoSource *vs){
 	s_=vs;
-	s_->RegisterSender(this);
+	s_->RegisterVideoTarget(this);
 	running_=true;
 	Start();
 }

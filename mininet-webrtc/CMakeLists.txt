@@ -15,20 +15,21 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
 	add_definitions(-DWEBRTC_POSIX -DWEBRTC_LINUX)
 endif()
 add_definitions(-fno-rtti)
-include_directories(/home/zsy/webrtc_2018_1/src/)
-include_directories(/home/zsy/webrtc_2018_1/src/third_party/abseil-cpp/)
-LINK_DIRECTORIES(/home/zsy/webrtc_2018_1/src/out/Default/obj/)
-#add_definitions(-std=c++11)
+include_directories(/home/zsy/webrtc_2018_12_24/src/)
+include_directories(/home/zsy/webrtc_2018_12_24/src/third_party/abseil-cpp/)
+LINK_DIRECTORIES(/home/zsy/webrtc_2018_12_24/src/out/Default/obj/)
+
 
 include_directories(${CMAKE_SOURCE_DIR}/razor)
 include_directories(${CMAKE_SOURCE_DIR}/)
 add_subdirectory(razor)
-add_subdirectory(test)
-
+#add_subdirectory(test)
+add_definitions(-std=c++11)
 set(simulation_FILES
 sender.cc
 receiver.cc
 fakevideosource.cc
+fake_rtp_rtcp_impl.cc
 )
 add_library(simulation STATIC ${simulation_FILES})
 
@@ -39,4 +40,10 @@ target_link_libraries(${EXECUTABLE_NAME}  simulation razor webrtc pthread)
 set(EXECUTABLE_NAME "t_receiver")
 add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/t_receiver.cc)
 target_link_libraries(${EXECUTABLE_NAME}  simulation razor webrtc pthread)
+
+set(EXECUTABLE_NAME "t_task")
+add_executable(${EXECUTABLE_NAME} ${CMAKE_SOURCE_DIR}/t_task_queue.cc)
+target_link_libraries(${EXECUTABLE_NAME}   webrtc pthread)
 #cmake .. -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++
+
+#void ThrowStdBadFunctionCall() { /*Throw(std::bad_function_call());*/std::abort(); }  throw_delegate.cc

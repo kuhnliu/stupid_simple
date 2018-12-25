@@ -14,10 +14,10 @@ Sender::Sender(){
 	bin_stream_init(&stream_);
 	clock_=webrtc::Clock::GetRealTimeClock();
 	inner_cf_=new webrtc::GoogCcNetworkControllerFactory(&m_nullLog);
-	webtc::BitrateConstraints rate_config;
-	rate_config.min_bitratre_bps=kInitialBitrateBps;
-	rate_config.start_bitratre_bps=2*kInitialBitrateBps;
-	rate_config.max_bitratre_bps=5*kInitialBitrateBps;
+	webrtc::BitrateConstraints rate_config;
+	rate_config.min_bitrate_bps=kInitialBitrateBps;
+	rate_config.start_bitrate_bps=2*kInitialBitrateBps;
+	rate_config.max_bitrate_bps=5*kInitialBitrateBps;
 	controller_.reset(new webrtc::RtpTransportControllerSend(clock_,
 			&m_nullLog,inner_cf_,rate_config));
 	pacer_=controller_->packet_sender();
@@ -27,6 +27,7 @@ Sender::Sender(){
 	webrtc::PacketRouter *router=controller_->packet_router();
 	router->AddSendRtpModule(rtp_rtcp_,true);
 	controller_->OnNetworkAvailability(true);
+	controller_->EnablePeriodicAlrProbing(true);
 }
 Sender::~Sender(){
 	bin_stream_destroy(&stream_);
@@ -243,6 +244,20 @@ void Sender::RTT(int64_t* rtt,
 	*min_rtt=min_rtt_;
 	*max_rtt=max_rtt_;
 }
+void Sender::OnTargetTransferRate(webrtc::TargetTransferRate rate){
+	int64_t bps=rate.target_rate.bps();
+	std::cout<<"rate "<<bps<<std::endl;
+	if(encoder_){
+		encoder_->ChangeRate(bps);
+	}
+}
+void Sender::OnStartRateUpdate(webrtc::DataRate rate){
+	int64_t bps=rate.bps();
+	std::cout<<"rate "<<bps<<std::endl;
+	if(encoder_){
+		encoder_->ChangeRate(bps);
+	}
+}
 sim_segment_t *Sender::get_segment_t(uint16_t sequence_number){
 	sim_segment_t *seg=NULL;
 	rtc::CritScope cs(&buf_mutex_);
@@ -305,7 +320,6 @@ void Sender::SendPing(int64_t now){
 }
 void Sender::UpdateRtt(uint32_t time,int64_t now){
 	uint32_t keep_rtt=5;
-	uint32_t averageRtt=0;
 	if(time>keep_rtt){
 		keep_rtt=time;
 	}
@@ -323,11 +337,17 @@ void Sender::UpdateRtt(uint32_t time,int64_t now){
 		min_rtt_=keep_rtt;
 		average_rtt_=keep_rtt;
 		rtt_num_++;
+		if(controller_){
+			controller_->OnRttUpdate(average_rtt_,max_rtt_);
+		}
 		return;
 	}
 	rtt_num_+=1;
 	sum_rtt_+=keep_rtt;
 	average_rtt_=sum_rtt_/rtt_num_;
+	if(controller_){
+		controller_->OnRttUpdate(average_rtt_,max_rtt_);
+	}
 	if(keep_rtt>max_rtt_)
 	{
 		max_rtt_=keep_rtt;

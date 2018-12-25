@@ -28,7 +28,7 @@ int main(){
 	uint32_t now=rtc::TimeMillis();
 	uint32_t Stop=now+runTime;
 	std::string name("webrtc");
-	//source.SetLogFile(name);
+	source.SetLogFile(name);
 	sender.Start();
 	while(run_status){
 		sender.Process();

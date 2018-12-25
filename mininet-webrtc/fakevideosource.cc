@@ -14,7 +14,7 @@ void VideoGenerator::Start(){
 void VideoGenerator::Stop(){
 	running_=false;
 }
-void VideoGenerator::RegisterSender(SendInterface *sender){
+void VideoGenerator::RegisterVideoTarget(VideoFrameTarget *sender){
 	sender_=sender;
 }
 void VideoGenerator::SetMinRate(uint32_t minR){
