@@ -21,7 +21,7 @@ public:
 	}
 	void Start() override;
 	void Stop() override;
-	void RegisterSender(SendInterface *sender) override;
+	void RegisterVideoTaget(VideoFrameTarget *sender) override;
 	void SetMinRate(uint32_t minR) override;
 	void ChangeRate(uint32_t bitrate) override;
 	void SendFrame();
@@ -36,7 +36,7 @@ private:
 	uint32_t rate_{0};
 	uint32_t minR_;
 	bool running_{false};
-	SendInterface* sender_{NULL};
+	VideoFrameTarget* sender_{NULL};
 	bool log_enable_{false};
 	uint32_t first_{0};
 	std::fstream f_rate_;

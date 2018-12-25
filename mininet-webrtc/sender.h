@@ -5,12 +5,14 @@
 #include "system_wrappers/include/clock.h"
 #include "modules/utility/include/process_thread.h"
 #include "system_wrappers/include/clock.h"
-#include "modules/congestion_controller/include/send_side_congestion_controller.h"
 #include "logging/rtc_event_log/rtc_event_log.h"
 #include "modules/rtp_rtcp/source/rtcp_packet/transport_feedback.h"
 #include "modules/pacing/paced_sender.h"
-
+#include "api/transport/network_control.h"
+#include "call/rtp_transport_controller_send.h"
+#include "modules/rtp_rtcp/include/rtp_rtcp_defines.h"
 #include "sendinterface.h"
+#include "fake_rtp_rtcp_impl.h"
 #include "videosource.h"
 #include "sim_proto.h"
 #include "cf_stream.h"
@@ -19,9 +21,9 @@
 #include <map>
 #include <string>
 namespace zsy{
-class Sender:public SendInterface,
-public webrtc::PacedSender::PacketSender,
-public webrtc::SendSideCongestionController::Observer{
+class Sender:public VideoFrameTarget,
+public SendInterface,
+public webrtc::TargetTransferRateObserver{
 public:
 	Sender();
 	~Sender();
@@ -32,7 +34,6 @@ public:
 	void Start();
 	void Stop();
 	void Process();
-
 	void SendVideo(uint8_t payload_type,int ftype,void *data,uint32_t len) override;
     virtual bool TimeToSendPacket(uint32_t ssrc,
                                   uint16_t sequence_number,
@@ -41,10 +42,12 @@ public:
                                   const webrtc::PacedPacketInfo& cluster_info);
     virtual size_t TimeToSendPadding(size_t bytes,
                                      const webrtc::PacedPacketInfo& cluster_info);
-	void OnNetworkChanged(uint32_t bitrate_bps,
-	                      uint8_t fraction_loss,  // 0 - 255.
-	                      int64_t rtt_ms,
-	                      int64_t probing_interval_ms) override;
+    void RTT(int64_t* rtt,
+             int64_t* avg_rtt,
+             int64_t* min_rtt,
+             int64_t* max_rtt) override;
+    virtual void OnTargetTransferRate(webrtc::TargetTransferRate) override;
+    virtual void OnStartRateUpdate(webrtc::DataRate) override;
 private:
 	sim_segment_t* get_segment_t(uint16_t sequence_number);
 	void SendSegment(sim_segment_t *seg,uint32_t now);
@@ -64,17 +67,20 @@ private:
 	uint16_t trans_seq_{1};
 	VideoSource *encoder_{NULL};
 	bin_stream_t	stream_;
-	std::unique_ptr<webrtc::ProcessThread> pm_;
-	std::unique_ptr<webrtc::SendSideCongestionControllerInterface> cc_;
-	webrtc::PacedSender *pacer_{NULL};
 	webrtc::RtcEventLogNullImpl m_nullLog;
 	webrtc::Clock *clock_{NULL};
+	webrtc::NetworkControllerFactoryInterface *inner_cf_{NULL};
+	std::unique_ptr<webrtc::RtpTransportControllerSend> controller_;
+	webrtc:: RtpPacketSender *pacer_{NULL};
+	FakeRtpRtcpImpl *rtp_rtcp_{NULL};
 	int64_t first_ts_{-1};
 	uint32_t uid_{1234};
 	uint32_t rtt_{0};
 	int64_t sum_rtt_{0};
 	int64_t rtt_num_{0};
-	uint32_t max_rtt_{0};
+	int64_t min_rtt_{0};
+	int64_t max_rtt_{0};
+	int64_t average_rtt_{0};
 	int64_t update_ping_ts_{0};
 	uint32_t base_seq_=0;
 };

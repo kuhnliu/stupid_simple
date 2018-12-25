@@ -5,19 +5,34 @@
 #include "absl/types/optional.h"
 #include "api/rtp_headers.h"
 #include "rtc_base/socket.h"
+#include "api/transport/goog_cc_factory.h"
+#include "api/bitrate_constraints.h"
 #include <memory.h>
 namespace zsy{
 const uint32_t kInitialBitrateBps = 500000;
 Sender::Sender(){
 	bin_stream_init(&stream_);
 	clock_=webrtc::Clock::GetRealTimeClock();
-	pm_=webrtc::ProcessThread::Create("ModuleThread");
+	inner_cf_=new webrtc::GoogCcNetworkControllerFactory(&m_nullLog);
+	webtc::BitrateConstraints rate_config;
+	rate_config.min_bitratre_bps=kInitialBitrateBps;
+	rate_config.start_bitratre_bps=2*kInitialBitrateBps;
+	rate_config.max_bitratre_bps=5*kInitialBitrateBps;
+	controller_.reset(new webrtc::RtpTransportControllerSend(clock_,
+			&m_nullLog,inner_cf_,rate_config));
+	pacer_=controller_->packet_sender();
+	controller_->RegisterTargetTransferRateObserver(this);
+	rtp_rtcp_=new FakeRtpRtcpImpl(this);
+	rtp_rtcp_->SetSSRC(uid_);
+	webrtc::PacketRouter *router=controller_->packet_router();
+	router->AddSendRtpModule(rtp_rtcp_,true);
+	controller_->OnNetworkAvailability(true);
 }
 Sender::~Sender(){
 	bin_stream_destroy(&stream_);
-	if(pacer_){
-		delete pacer_;
-	}
+	webrtc::PacketRouter *router=controller_->packet_router();
+	router->RemoveSendRtpModule(rtp_rtcp_);
+	delete  rtp_rtcp_;
 	{
 		rtc::CritScope cs(&buf_mutex_);
 		while(!pending_buf_.empty()){
@@ -31,7 +46,7 @@ Sender::~Sender(){
 }
 void Sender::SetEncoder(VideoSource *encoder){
 	encoder_=encoder;
-	encoder_->RegisterSender(this);
+	encoder_->RegisterVideoTarget(this);
 }
 void Sender::Bind(char*ip,uint16_t port){
 	 su_udp_create(ip,port,&fd_);
@@ -41,20 +56,6 @@ void Sender::SetPeer(char* addr){
 }
 void Sender::Start(){
 	running_=true;
-	if(!pacer_){
-		pacer_=new webrtc::PacedSender(clock_,this,&m_nullLog);
-		pacer_->SetEstimatedBitrate(kInitialBitrateBps);
-	}
-	cc_=absl::make_unique<webrtc::SendSideCongestionController>(
-		      clock_, this /* observer */, &m_nullLog, pacer_);
-	cc_->SignalNetworkState(webrtc::NetworkState::kNetworkDown);
-	cc_->SetBweBitrates(kInitialBitrateBps,
-			  	  	  	 kInitialBitrateBps,
-	                     10*kInitialBitrateBps);
-	cc_->SignalNetworkState(webrtc::NetworkState::kNetworkUp);
-	pm_->RegisterModule(pacer_, RTC_FROM_HERE);
-	pm_->RegisterModule(cc_.get(), RTC_FROM_HERE);
-	pm_->Start();
 	if(encoder_){
 		encoder_->SetMinRate(kInitialBitrateBps);
 		encoder_->Start();		
@@ -65,9 +66,6 @@ void Sender::Stop(){
 	if(encoder_){
 		encoder_->Stop();
 	}
-	pm_->DeRegisterModule(pacer_);
-	pm_->DeRegisterModule(cc_.get());
-	pm_->Stop();
 }
 void Sender::Process(){
 	if(!running_){
@@ -181,10 +179,10 @@ bool Sender::TimeToSendPacket(uint32_t ssrc,
 	if(seg){
 		SendSegment(seg,now);
 		uint16_t overhead=seg->data_size+SIM_SEGMENT_HEADER_SIZE;
-		if(cc_){
-		cc_->AddPacket(uid_,sequence_number,overhead,cluster_info);
-		rtc::SentPacket sentPacket((int64_t)sequence_number,now);
-		cc_->OnSentPacket(sentPacket);
+		if(controller_){
+			controller_->AddPacket(uid_,sequence_number,overhead,cluster_info);
+			rtc::SentPacket sentPacket((int64_t)sequence_number,now);
+			controller_->OnSentPacket(sentPacket);
 		}
 		delete seg;
 	}
@@ -204,10 +202,10 @@ int  Sender::SendPadding(uint16_t payload_len,uint32_t ts,const webrtc::PacedPac
 	INIT_SIM_HEADER(header, SIM_PAD, uid_);
 	sim_encode_msg(&stream_, &header, &pad);
 	SendToNetwork(stream_.data,stream_.used);
-	if(cc_){
-    cc_->AddPacket(uid_,sequence_number,overhead,pacing_info);
-    rtc::SentPacket sentPacket((int64_t)sequence_number,ts);
-    cc_->OnSentPacket(sentPacket);
+	if(controller_){
+		controller_->AddPacket(uid_,sequence_number,overhead,pacing_info);
+		rtc::SentPacket sentPacket((int64_t)sequence_number,ts);
+    	controller_->OnSentPacket(sentPacket);
     }
 	return overhead;
 }
@@ -236,16 +234,14 @@ size_t Sender::TimeToSendPadding(size_t bytes,
 	}
 	return bytes;
 }
-void Sender::OnNetworkChanged(uint32_t bitrate_bps,
-                      uint8_t fraction_loss,  // 0 - 255.
-                      int64_t rtt_ms,
-                      int64_t probing_interval_ms){
-	if(!running_){
-		return;
-	}
-	if(encoder_){
-		encoder_->ChangeRate(bitrate_bps);
-	}
+void Sender::RTT(int64_t* rtt,
+         int64_t* avg_rtt,
+         int64_t* min_rtt,
+         int64_t* max_rtt){
+	*rtt=rtt_;
+	*avg_rtt=average_rtt_;
+	*min_rtt=min_rtt_;
+	*max_rtt=max_rtt_;
 }
 sim_segment_t *Sender::get_segment_t(uint16_t sequence_number){
 	sim_segment_t *seg=NULL;
@@ -322,31 +318,30 @@ void Sender::UpdateRtt(uint32_t time,int64_t now){
 		rtt_ = 10;
 	if(rtt_num_==0)
 	{
-		if(cc_){
-			cc_->OnRttUpdate(keep_rtt,keep_rtt);
-		}
 		sum_rtt_=keep_rtt;
 		max_rtt_=keep_rtt;
+		min_rtt_=keep_rtt;
+		average_rtt_=keep_rtt;
 		rtt_num_++;
 		return;
 	}
 	rtt_num_+=1;
 	sum_rtt_+=keep_rtt;
-	averageRtt=sum_rtt_/rtt_num_;
+	average_rtt_=sum_rtt_/rtt_num_;
 	if(keep_rtt>max_rtt_)
 	{
 		max_rtt_=keep_rtt;
 	}
-	if(cc_){
-		cc_->OnRttUpdate(averageRtt,max_rtt_);
+	if(keep_rtt<min_rtt_){
+		min_rtt_=keep_rtt;
 	}
 }
 void Sender::InnerProcessFeedback(sim_feedback_t* feedback){
 	std::unique_ptr<webrtc::rtcp::TransportFeedback> fb=
 	webrtc::rtcp::TransportFeedback::ParseFrom((uint8_t*)feedback->feedback, feedback->feedback_size);
-	if(cc_){
+	if(controller_){
         //printf("fb %d\n",feedback->feedback_size);
-		cc_->OnTransportFeedback(*fb.get());
+		controller_->OnTransportFeedback(*fb.get());
 	}
 }
 void Sender::SendSegment(sim_segment_t *seg,uint32_t now){
