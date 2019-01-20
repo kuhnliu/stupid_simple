@@ -51,12 +51,13 @@ void MyQuicSender::RecordRate(QuicTime now){
 	if(now>last_output_){
 		int64_t bw=0;
 		QuicTime::Delta delta=now-ref_time_;
-		int64_t ms=delta.ToMilliseconds()+offset_;
+		int32_t ms=delta.ToMilliseconds()+offset_;
 		bw=sent_packet_manager_.BandwidthEstimate().ToKBitsPerSecond();
 		if(f_rate_.is_open()){
 			char line [256];
 			memset(line,0,256);
-			sprintf (line, "%lld %16lld",ms,bw);
+            float second=(float)ms/1000;
+			sprintf (line, "%f %16lld",second,bw);
 			f_rate_<<line<<std::endl;
 		}
 		last_output_=now+QuicTime::Delta::FromMilliseconds(100);
@@ -169,10 +170,14 @@ void MyQuicSender::SendFakePacket(){
 	writer.WriteBytesToUInt64(header.seq_len,seq_);
 	uint8_t type=STREAM_FRAME;
 	writer.WriteBytes(&type,1);
-	seq_++;
+    QuicTime now=clock_.Now();
+    QuicTime::Delta delta=now-QuicTime::Zero();
+    uint32_t ts=delta.ToMilliseconds();
+    writer.WriteUInt32(ts);
 	socket_->SendTo(&peer_,(uint8_t*)buf,kMaxPacketSize);
 	uint16_t payload=kMaxPacketSize-(1+header.seq_len+1);
 	OnPacketSent(header.seq,(QuicPacketNumberLength)header.seq_len,payload);
+    seq_++;
 	//std::cout<<"new "<<header.seq<<std::endl;
 }
 void MyQuicSender::SendRetransmission(){
@@ -203,12 +208,15 @@ void MyQuicSender::OnRetransPacket(QuicPendingRetransmission pending){
 	QuicDataWriter writer(kMaxPacketSize, buf, NETWORK_BYTE_ORDER);
 	writer.WriteBytes(&public_flags,1);
 	writer.WriteBytesToUInt64(header.seq_len,seq_);
-	seq_++;
 	uint8_t type=STREAM_FRAME;
 	writer.WriteBytes(&type,1);
+    QuicTime now=clock_.Now();
+    QuicTime::Delta delta=now-QuicTime::Zero();
+    uint32_t ts=delta.ToMilliseconds();
+    writer.WriteUInt32(ts);
 	socket_->SendTo(&peer_,(uint8_t*)buf,kMaxPacketSize);
 	uint16_t payload=kMaxPacketSize-(1+header.seq_len+1);
-	QuicTime now=clock_.Now();
+
 	SerializedPacket info(header.seq,(QuicPacketNumberLength)header.seq_len,NULL,payload,false,false);
 	//void QuicPacketCreator::ReserializeAllFrames
 	for(const QuicFrame& frame : pending.retransmittable_frames){
@@ -216,6 +224,7 @@ void MyQuicSender::OnRetransPacket(QuicPendingRetransmission pending){
 	}
 	uint64_t old_seq=pending. packet_number;
 	sent_packet_manager_.OnPacketSent(&info,old_seq,now,LOSS_RETRANSMISSION,HAS_RETRANSMITTABLE_DATA);
+    seq_++;
 	//std::cout<<"retrans "<<old_seq<<" new seq "<<header.seq<<std::endl;
 }
 void MyQuicSender::SendStopWaitingFrame(){

@@ -56,7 +56,8 @@ void MyQuicVideoSender::RecordRate(QuicTime now){
 		if(f_rate_.is_open()){
 			char line [256];
 			memset(line,0,256);
-			sprintf (line, "%lld %16lld",ms,bw);
+            float second=(float)ms/1000;
+			sprintf (line, "%f %16lld",second,bw);
 			f_rate_<<line<<std::endl;
 		}
 		last_output_=now+QuicTime::Delta::FromMilliseconds(100);

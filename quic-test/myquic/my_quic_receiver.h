@@ -49,11 +49,13 @@ public:
     void SetRecordPrefix(std::string name);
     void EnableRateRecord();
     void EnableLossRecord();
+    void EnableOwdRecord();
 private:
 	void MaybeSendAck();
 	void SendAck();
     void RecordLoss(uint64_t seq);
     void RecordRate(QuicTime now);
+    void RecordOnewayDelay(uint64_t seq,uint32_t owd);
 	bool first_{true};
 	zsy::Socket *socket_{NULL};
 	su_addr peer_;
@@ -73,10 +75,9 @@ private:
     QuicTime ref_time_;
     QuicTime next_output_;
     uint64_t recv_byte_{0};
-    bool enable_loss_record_{false};
-    bool enable_rate_record_{false};
     std::fstream f_loss_;
     std::fstream f_rate_;
+    std::fstream f_owd_;
     std::string log_prefix_;
 };
 }

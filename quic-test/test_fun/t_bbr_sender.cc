@@ -41,7 +41,9 @@ int main(int argc,char *argv[]){
 	sender.set_duration(duration);
     sender.SetTimeOffset(offset);
 	std::string name=test_case+std::string("-my-bbr");
-	sender.EnableRateRecord(name);
+	sender.SetRecordPrefix(name);
+    sender.EnableRateRecord();
+    sender.EnableLossRecord();
 	while(sender.Process()&&run_status){
 
 	}
